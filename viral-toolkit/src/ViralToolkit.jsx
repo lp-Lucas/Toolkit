@@ -312,21 +312,30 @@ function startExtraction(video, url, duration, count, timeout, resolve, reject, 
 
 /* ─── AI Analysis ─── */
 async function analyzeWithAI(imageDataUrls, contextInfo) {
-  const prompt = `Você é um especialista em viralização de vídeos nas redes sociais brasileiras (TikTok, Instagram Reels, YouTube Shorts).
+const prompt = `Você é um analista sênior de conteúdo viral com 10 anos de experiência em redes sociais brasileiras. Sua especialidade é prever viralização com alta precisão.
 
-Analise estes ${imageDataUrls.length} frames de um vídeo e avalie cada critério de 0 a 10, com justificativa curta em português brasileiro.
-${contextInfo ? `\nContexto adicional: ${contextInfo}` : ""}
+REGRAS DE PONTUAÇÃO (siga rigorosamente):
+- Nota 9-10: Excepcional. Só dê se o critério for claramente forte. Elementos que geram milhões de views.
+- Nota 7-8: Bom. Acima da média, tem potencial real.
+- Nota 5-6: Mediano. Não se destaca, é o padrão da maioria.
+- Nota 3-4: Fraco. Precisa de melhorias significativas.
+- Nota 1-2: Muito fraco. Quase inexistente.
 
-Critérios:
-1. hook — Gancho nos primeiros 3 segundos (peso 20%)
-2. trend — Tema em tendência (peso 15%)
-3. emotion — Gatilho emocional forte (peso 18%)
-4. shareable — Fator de compartilhamento (peso 15%)
-5. duration — Duração otimizada para plataforma (peso 8%)
-6. audio — Potencial de áudio trending (peso 10%)
-7. retention — Retenção até o final (peso 14%)
+IMPORTANTE: Não dê notas "seguras" no meio. Seja ousado. Um vídeo viral real deve ter pelo menos 2-3 critérios acima de 8. Um vídeo mediano deve ter notas abaixo de 5 em vários critérios. Diferencie claramente.
 
-Responda SOMENTE com JSON válido, sem markdown, sem backticks, sem texto extra:
+Analise estes ${imageDataUrls.length} frames sequenciais de um vídeo e avalie:
+${contextInfo ? "Contexto do criador: " + contextInfo : ""}
+
+CRITÉRIOS:
+1. hook (peso 20%) - GANCHO INICIAL: O primeiro frame prende IMEDIATAMENTE? Tem texto impactante, expressão forte, elemento visual surpreendente? Se for genérico (pessoa falando sem contexto visual), nota máxima 5.
+2. trend (peso 15%) - TENDÊNCIA: O tema está em ALTA AGORA nas redes? Temas genéricos (motivação, empreendedorismo) = máximo 5. Temas específicos do momento (polêmica atual, trend específica, formato viral do momento) = 7+.
+3. emotion (peso 18%) - EMOÇÃO: Provoca reação FORTE? Riso, indignação, choque, inveja, nostalgia? Se for apenas "interessante" = máximo 5. Se fizer a pessoa PARAR de scrollar = 8+.
+4. shareable (peso 15%) - COMPARTILHÁVEL: A pessoa VAI marcar alguém ou enviar no grupo? "Isso é a cara do fulano" = 9. "Interessante" = 4. Conteúdo que gera debate = 8+.
+5. duration (peso 8%) - DURAÇÃO: 7-15s = 9-10. 15-30s = 7-8. 30-60s = 5-6. 60s+ = 3-4.
+6. audio (peso 10%) - ÁUDIO: Só consigo avaliar pelo visual. Se parece usar formato trending (lip sync, dueto, remix) = 7+. Se parece ser só fala normal sem música = 3-4. Se não dá pra saber = 5.
+7. retention (peso 14%) - RETENÇÃO: Os frames mostram progressão visual? Tem plot twist, revelação, antes/depois? Se todos os frames parecem iguais = 3-4. Se tem variação clara e motivo pra assistir até o fim = 8+.
+
+Responda SOMENTE com JSON válido, sem markdown, sem backticks, sem texto antes ou depois:
 {"scores":{"hook":{"score":8,"reason":"..."},"trend":{"score":6,"reason":"..."},"emotion":{"score":7,"reason":"..."},"shareable":{"score":5,"reason":"..."},"duration":{"score":9,"reason":"..."},"audio":{"score":4,"reason":"..."},"retention":{"score":7,"reason":"..."}},"summary":"Resumo geral em 2 frases","top_tip":"Dica mais importante para melhorar"}`;
 
   const response = await fetch("/api/analyze", {
