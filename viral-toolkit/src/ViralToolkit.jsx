@@ -182,7 +182,7 @@ function imageToBase64(file) {
 }
 
 /* ─── Video frame extraction ─── */
-function extractVideoFrames(file, count = 6) {
+function extractVideoFrames(file, count = 4) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const video = document.createElement("video");
@@ -312,15 +312,15 @@ function startExtraction(video, url, duration, count, timeout, resolve, reject, 
 
 /* ─── AI Analysis ─── */
 async function analyzeWithAI(imageDataUrls, contextInfo) {
-  // Formato OpenAI/Groq para imagens (image_url com base64)
-  const imageContent = imageDataUrls.map((dataUrl, i) => ([
-    { type: "image_url", image_url: { url: dataUrl } },
-    { type: "text", text: `[Frame ${i+1} de ${imageDataUrls.length}]` }
-  ])).flat();
+  // Groq/Llama 4 Scout suporta máximo 5 imagens — usamos até 4 + o prompt
+  const limitedImages = imageDataUrls.slice(0, 4);
+  const imageContent = limitedImages.map((dataUrl) => (
+    { type: "image_url", image_url: { url: dataUrl } }
+  ));
 
   const prompt = `Você é um especialista em viralização de vídeos nas redes sociais brasileiras (TikTok, Instagram Reels, YouTube Shorts).
 
-Analise estes frames de um vídeo e avalie cada critério de 0 a 10, com justificativa curta em português brasileiro.
+Analise estes ${limitedImages.length} frames de um vídeo e avalie cada critério de 0 a 10, com justificativa curta em português brasileiro.
 ${contextInfo ? `\nContexto adicional: ${contextInfo}` : ""}
 
 Critérios:
@@ -408,7 +408,7 @@ export default function ViralToolkit() {
     setAnalysisState("extracting");
     setLoadingStep("Extraindo frames do vídeo...");
     try {
-      const { frames, duration } = await extractVideoFrames(file, 6);
+      const { frames, duration } = await extractVideoFrames(file, 4);
       setVideoDuration(duration);
       setUploadedImages(frames.map(f => f.dataUrl));
       setAnalysisState("idle"); // Ready to analyze
@@ -427,11 +427,11 @@ export default function ViralToolkit() {
 
   /* Handle image files */
   const handleImageFiles = useCallback(async (files) => {
-    const imageFiles = Array.from(files).filter(f => f.type.startsWith("image/")).slice(0, 8);
+    const imageFiles = Array.from(files).filter(f => f.type.startsWith("image/")).slice(0, 4);
     if (imageFiles.length === 0) return;
     try {
       const newImages = await Promise.all(imageFiles.map(f => imageToBase64(f)));
-      setUploadedImages(prev => [...prev, ...newImages].slice(0, 8));
+      setUploadedImages(prev => [...prev, ...newImages].slice(0, 4));
       setAiResult(null); setAnalysisState("idle"); setErrorMsg("");
     } catch (err) { setErrorMsg(err.message); }
   }, []);
@@ -604,7 +604,7 @@ export default function ViralToolkit() {
                         </p>
                         <p style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>ou clique para selecionar</p>
                         <p style={{ fontSize: 11, color: "rgba(255,255,255,0.25)", fontFamily: "'Space Mono', monospace", marginTop: 10 }}>
-                          {uploadMode === "video" ? "MP4, MOV, WEBM — extração automática de frames" : "JPG, PNG, WEBP — até 8 imagens"}
+                          {uploadMode === "video" ? "MP4, MOV, WEBM — extração automática de frames" : "JPG, PNG, WEBP — até 4 imagens"}
                         </p>
                       </div>
                     )}
@@ -643,7 +643,7 @@ export default function ViralToolkit() {
 
                         <div style={{ marginBottom: 12 }}>
                           <p style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", marginBottom: 8, fontFamily: "'Space Mono', monospace", letterSpacing: 1 }}>
-                            {uploadMode === "video" ? `FRAMES EXTRAÍDOS (${uploadedImages.length})` : `SCREENSHOTS (${uploadedImages.length}/8)`}
+                            {uploadMode === "video" ? `FRAMES EXTRAÍDOS (${uploadedImages.length})` : `SCREENSHOTS (${uploadedImages.length}/4)`}
                           </p>
                           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                             {uploadedImages.map((img, i) => (
@@ -655,7 +655,7 @@ export default function ViralToolkit() {
                                 <span style={{ position: "absolute", bottom: 2, left: 4, fontSize: 8, fontFamily: "'Space Mono', monospace", color: "#fff", background: "rgba(0,0,0,0.7)", padding: "1px 4px", borderRadius: 3 }}>{i+1}</span>
                               </div>
                             ))}
-                            {uploadMode === "images" && uploadedImages.length < 8 && (
+                            {uploadMode === "images" && uploadedImages.length < 4 && (
                               <div onClick={() => fileInputRef.current?.click()} style={{ width: 80, height: 56, borderRadius: 8, border: "1px dashed rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.3)", fontSize: 18, cursor: "pointer" }}>+</div>
                             )}
                           </div>
@@ -683,7 +683,7 @@ export default function ViralToolkit() {
                         <p style={{ fontSize: 15, fontWeight: 600, color: "#fff", marginBottom: 8, animation: "breathe 2.2s ease infinite" }}>{LOADING_MSGS[loadingIdx]}</p>
                         <p style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", fontFamily: "'Space Mono', monospace" }}>Analisando {uploadedImages.length} frames com IA...</p>
                         <div style={{ display: "flex", gap: 6, justifyContent: "center", marginTop: 20, flexWrap: "wrap" }}>
-                          {uploadedImages.slice(0, 6).map((img, i) => <img key={i} src={img} style={{ width: 56, height: 42, borderRadius: 6, objectFit: "cover", border: "1px solid rgba(255,255,255,0.1)", opacity: 0.6 }} alt="" />)}
+                          {uploadedImages.slice(0, 4).map((img, i) => <img key={i} src={img} style={{ width: 56, height: 42, borderRadius: 6, objectFit: "cover", border: "1px solid rgba(255,255,255,0.1)", opacity: 0.6 }} alt="" />)}
                         </div>
                       </div>
                     )}
