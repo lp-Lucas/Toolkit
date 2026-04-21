@@ -73,9 +73,11 @@ export default async function handler(req, res) {
         ?.map((p) => p.text || "")
         .join("") || "";
 
-    return res.status(200).json({
-      content: [{ type: "text", text }],
-    });
+    console.log("Gemini raw response:", JSON.stringify(data).slice(0, 500));
+return res.status(200).json({
+  content: [{ type: "text", text }],
+  debug: JSON.stringify(data).slice(0, 300),
+});
   } catch (error) {
     console.error("Erro no proxy:", error);
     return res.status(500).json({ error: "Erro interno do servidor" });

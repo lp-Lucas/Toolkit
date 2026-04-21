@@ -171,7 +171,7 @@ function imageToBase64(file) {
         if (w > maxW) { h = Math.round(h * (maxW / w)); w = maxW; }
         canvas.width = w; canvas.height = h;
         canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL("image/jpeg", 0.7));
+        resolve(canvas.toDataURL("image/jpeg", 0.4));
       };
       img.onerror = () => reject(new Error("Erro ao processar imagem."));
       img.src = reader.result;
@@ -254,7 +254,7 @@ function startExtraction(video, url, duration, count, timeout, resolve, reject, 
       const isBlank = sample[0] === 0 && sample[1] === 0 && sample[2] === 0;
 
       if (!isBlank) {
-        frames.push({ time: times[idx], dataUrl: canvas.toDataURL("image/jpeg", 0.65) });
+        frames.push({ time: times[idx], dataUrl: canvas.toDataURL("image/jpeg", 0.4) });
       }
     } catch (e) { /* skip frame */ }
     idx++;
