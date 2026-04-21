@@ -1,33 +1,83 @@
+// api/analyze.js
+// Vercel Serverless Function — proxy para Google Gemini (grátis)
+// Usa Gemini 2.5 Flash com visão (analisa múltiplas imagens)
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
-  const GROQ_API_KEY = process.env.GROQ_API_KEY;
-  if (!GROQ_API_KEY) {
-    return res.status(500).json({ error: "GROQ_API_KEY não configurada" });
+
+  const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
+  if (!GEMINI_API_KEY) {
+    return res.status(500).json({
+      error: "GEMINI_API_KEY não configurada. Vá em Settings > Environment Variables no Vercel.",
+    });
   }
+
   try {
-    const { messages } = req.body;
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    const { images, prompt } = req.body;
+
+    if (!images || !Array.isArray(images) || images.length === 0) {
+      return res.status(400).json({ error: "Campo 'images' é obrigatório." });
+    }
+
+    // Montar as parts no formato Gemini
+    const parts = [];
+
+    images.forEach((dataUrl, i) => {
+      // dataUrl = "data:image/jpeg;base64,/9j/4AAQ..."
+      const base64Data = dataUrl.split(",")[1];
+      const mimeType = dataUrl.match(/data:(.*?);/)?.[1] || "image/jpeg";
+
+      parts.push({
+        inline_data: {
+          mime_type: mimeType,
+          data: base64Data,
+        },
+      });
+      parts.push({
+        text: `[Frame ${i + 1} de ${images.length}]`,
+      });
+    });
+
+    // Adicionar o prompt no final
+    parts.push({ text: prompt });
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+    const response = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + GROQ_API_KEY,
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "meta-llama/llama-4-scout-17b-16e-instruct",
-        max_tokens: 1024,
-        temperature: 0.3,
-        messages: messages,
+        contents: [{ parts }],
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 1024,
+        },
       }),
     });
+
     const data = await response.json();
+
     if (!response.ok) {
-      return res.status(response.status).json({ error: data.error?.message || "Erro" });
+      console.error("Gemini error:", JSON.stringify(data));
+      return res.status(response.status).json({
+        error: data.error?.message || "Erro na API Gemini",
+      });
     }
-    const text = data.choices?.[0]?.message?.content || "";
-    return res.status(200).json({ content: [{ type: "text", text }] });
+
+    // Extrair texto da resposta
+    const text =
+      data.candidates?.[0]?.content?.parts
+        ?.map((p) => p.text || "")
+        .join("") || "";
+
+    return res.status(200).json({
+      content: [{ type: "text", text }],
+    });
   } catch (error) {
-    return res.status(500).json({ error: "Erro interno" });
+    console.error("Erro no proxy:", error);
+    return res.status(500).json({ error: "Erro interno do servidor" });
   }
 }
