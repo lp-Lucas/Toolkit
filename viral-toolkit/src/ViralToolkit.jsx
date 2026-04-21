@@ -426,7 +426,7 @@ export default function ViralToolkit() {
     setAnalysisState("extracting");
     setLoadingStep("Extraindo frames do vídeo...");
     try {
-      const { frames, duration } = await extractVideoFrames(file, 4);
+      const { frames, duration } = await extractVideoFrames(file, 8);
       setVideoDuration(duration);
       setUploadedImages(frames.map(f => f.dataUrl));
       setAnalysisState("idle"); // Ready to analyze
