@@ -344,12 +344,33 @@ Responda SOMENTE com JSON válido, sem markdown, sem backticks:
   });
   const data = await response.json();
   if (data.error) throw new Error(data.error || "Erro na API.");
-  const text = data.content.map(b => b.text || "").join("");
+ const text = data.content.map(b => b.text || "").join("");
   const cleaned = text.replace(/```json|```/g, "").trim();
-  // Extrair apenas o JSON da resposta (ignora texto antes/depois)
   const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error("A IA não retornou um JSON válido. Tente novamente.");
-  return JSON.parse(jsonMatch[0]);
+  
+  let jsonStr = jsonMatch[0];
+  // Corrige problemas comuns do Llama: aspas inteligentes, quebras de linha dentro de strings
+  jsonStr = jsonStr.replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'");
+  jsonStr = jsonStr.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
+  
+  try {
+    return JSON.parse(jsonStr);
+  } catch (e) {
+    // Fallback: tenta extrair os scores manualmente
+    const fallback = { scores: {}, summary: "", top_tip: "" };
+    const ids = ["hook","trend","emotion","shareable","duration","audio","retention"];
+    ids.forEach(id => {
+      const scoreMatch = jsonStr.match(new RegExp('"' + id + '"\\s*:\\s*\\{[^}]*"score"\\s*:\\s*(\\d+)'));
+      const reasonMatch = jsonStr.match(new RegExp('"' + id + '"\\s*:\\s*\\{[^}]*"reason"\\s*:\\s*"([^"]*)"'));
+      fallback.scores[id] = { score: scoreMatch ? parseInt(scoreMatch[1]) : 5, reason: reasonMatch ? reasonMatch[1] : "" };
+    });
+    const sumMatch = jsonStr.match(/"summary"\s*:\s*"([^"]*)"/);
+    const tipMatch = jsonStr.match(/"top_tip"\s*:\s*"([^"]*)"/);
+    fallback.summary = sumMatch ? sumMatch[1] : "";
+    fallback.top_tip = tipMatch ? tipMatch[1] : "";
+    return fallback;
+  }
 }
 
 /* ─── Main App ─── */
