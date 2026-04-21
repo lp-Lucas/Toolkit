@@ -344,31 +344,29 @@ Responda SOMENTE com JSON válido, sem markdown, sem backticks:
   });
   const data = await response.json();
   if (data.error) throw new Error(data.error || "Erro na API.");
- const text = data.content.map(b => b.text || "").join("");
+  const text = data.content.map(b => b.text || "").join("");
   const cleaned = text.replace(/```json|```/g, "").trim();
   const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error("A IA não retornou um JSON válido. Tente novamente.");
   
   let jsonStr = jsonMatch[0];
-  // Corrige problemas comuns do Llama: aspas inteligentes, quebras de linha dentro de strings
   jsonStr = jsonStr.replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'");
   jsonStr = jsonStr.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
   
   try {
     return JSON.parse(jsonStr);
   } catch (e) {
-    // Fallback: tenta extrair os scores manualmente
     const fallback = { scores: {}, summary: "", top_tip: "" };
     const ids = ["hook","trend","emotion","shareable","duration","audio","retention"];
     ids.forEach(id => {
-      const scoreMatch = jsonStr.match(new RegExp('"' + id + '"\\s*:\\s*\\{[^}]*"score"\\s*:\\s*(\\d+)'));
-      const reasonMatch = jsonStr.match(new RegExp('"' + id + '"\\s*:\\s*\\{[^}]*"reason"\\s*:\\s*"([^"]*)"'));
-      fallback.scores[id] = { score: scoreMatch ? parseInt(scoreMatch[1]) : 5, reason: reasonMatch ? reasonMatch[1] : "" };
+      const sm = jsonStr.match(new RegExp('"' + id + '"\\s*:\\s*\\{[^}]*?"score"\\s*:\\s*(\\d+)'));
+      const rm = jsonStr.match(new RegExp('"' + id + '"\\s*:\\s*\\{[^}]*?"reason"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)'));
+      fallback.scores[id] = { score: sm ? parseInt(sm[1]) : 5, reason: rm ? rm[1] : "Análise indisponível" };
     });
-    const sumMatch = jsonStr.match(/"summary"\s*:\s*"([^"]*)"/);
-    const tipMatch = jsonStr.match(/"top_tip"\s*:\s*"([^"]*)"/);
-    fallback.summary = sumMatch ? sumMatch[1] : "";
-    fallback.top_tip = tipMatch ? tipMatch[1] : "";
+    const sumM = jsonStr.match(/"summary"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+    const tipM = jsonStr.match(/"top_tip"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+    fallback.summary = sumM ? sumM[1] : "Análise concluída com dados parciais.";
+    fallback.top_tip = tipM ? tipM[1] : "Tente enviar novamente para uma análise mais completa.";
     return fallback;
   }
 }
