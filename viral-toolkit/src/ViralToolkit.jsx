@@ -345,7 +345,11 @@ Responda SOMENTE com JSON válido, sem markdown, sem backticks:
   const data = await response.json();
   if (data.error) throw new Error(data.error || "Erro na API.");
   const text = data.content.map(b => b.text || "").join("");
-  return JSON.parse(text.replace(/```json|```/g, "").trim());
+  const cleaned = text.replace(/```json|```/g, "").trim();
+  // Extrair apenas o JSON da resposta (ignora texto antes/depois)
+  const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error("A IA não retornou um JSON válido. Tente novamente.");
+  return JSON.parse(jsonMatch[0]);
 }
 
 /* ─── Main App ─── */
