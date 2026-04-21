@@ -1,5 +1,7 @@
+import ViralToolkit from './ViralToolkit.jsx'
+
 function App() {
-  return <h1>FUNCIONOU</h1>;
+  return <ViralToolkit />
 }
 
-export default App;
+export default App
