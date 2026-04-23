@@ -871,6 +871,292 @@ Responda SOMENTE com JSON:
   );
 }
 
+/* ─── Video Analyzer ─── */
+
+function VideoAnalyzer() {
+  const [mode, setMode] = useState("upload"); // "upload" | "url"
+  const [file, setFile] = useState(null);
+  const [videoUrl, setVideoUrl] = useState("");
+  const [preview, setPreview] = useState(null);
+  const [analysis, setAnalysis] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState("");
+  const [dragOver, setDragOver] = useState(false);
+  const inputRef = useRef(null);
+
+  const handleFile = (f) => {
+    if (!f || !f.type.startsWith("video/")) return;
+    setFile(f);
+    setAnalysis(null);
+    const url = URL.createObjectURL(f);
+    setPreview(url);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    handleFile(e.dataTransfer.files[0]);
+  };
+
+  const analyze = async () => {
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) { alert("VITE_GEMINI_API_KEY não configurada no .env"); return; }
+
+    setLoading(true);
+    setAnalysis(null);
+
+    try {
+      let base64 = null;
+      let mimeType = "video/mp4";
+
+      if (mode === "upload" && file) {
+        setProgress("Carregando vídeo...");
+        mimeType = file.type || "video/mp4";
+        base64 = await new Promise((res, rej) => {
+          const r = new FileReader();
+          r.onload = () => res(r.result.split(",")[1]);
+          r.onerror = rej;
+          r.readAsDataURL(file);
+        });
+      }
+
+      setProgress("Analisando com Gemini...");
+
+      const prompt = `Você é um especialista em conteúdo viral para redes sociais brasileiras.
+
+Analise este vídeo e avalie seu potencial viral com base nos seguintes critérios:
+
+1. GANCHO (primeiros 3 segundos): o início prende atenção?
+2. EMOÇÃO: gera riso, surpresa, curiosidade, inspiração ou choque?
+3. RETENÇÃO: há motivo para assistir até o fim?
+4. COMPARTILHAMENTO: dá vontade de mandar para alguém?
+5. TENDÊNCIA: o tema está em alta nas redes agora?
+6. ÁUDIO: o áudio/trilha ajuda no engajamento?
+7. EDIÇÃO: ritmo, cortes e qualidade visual estão bons?
+
+Responda SOMENTE com JSON válido, sem markdown:
+{
+  "viralScore": <0-100>,
+  "verdict": "frase de 1 linha resumindo o potencial viral",
+  "scores": {
+    "hook": <0-10>,
+    "emotion": <0-10>,
+    "retention": <0-10>,
+    "shareable": <0-10>,
+    "trend": <0-10>,
+    "audio": <0-10>,
+    "editing": <0-10>
+  },
+  "strengths": ["ponto forte 1", "ponto forte 2", "ponto forte 3"],
+  "improvements": ["melhoria 1", "melhoria 2", "melhoria 3"],
+  "bestPlatform": "plataforma ideal para este vídeo",
+  "estimatedReach": "estimativa de alcance: ex: Potencial de 10k-50k views",
+  "hookSuggestion": "sugestão de gancho melhorado para os primeiros 3 segundos",
+  "bestPostTime": "melhor horário para postar este tipo de conteúdo"
+}`;
+
+      const parts = base64
+        ? [{ inlineData: { mimeType, data: base64 } }, { text: prompt }]
+        : [{ text: `URL do vídeo: ${videoUrl}\n\n${prompt}` }];
+
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts }],
+            generationConfig: { temperature: 0.4, maxOutputTokens: 2048 },
+          }),
+        }
+      );
+
+      const data = await res.json();
+      const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (match) setAnalysis(JSON.parse(match[0]));
+      else throw new Error("Resposta inválida do Gemini");
+    } catch (e) {
+      console.error(e);
+      alert("Erro ao analisar: " + e.message);
+    } finally {
+      setLoading(false);
+      setProgress("");
+    }
+  };
+
+  const scoreLabels = {
+    hook: "Gancho (3s)", emotion: "Emoção", retention: "Retenção",
+    shareable: "Compartilhável", trend: "Tendência", audio: "Áudio", editing: "Edição",
+  };
+
+  const canAnalyze = mode === "upload" ? !!file : !!videoUrl.trim();
+
+  return (
+    <div>
+      {/* Mode toggle */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+        {[{ id: "upload", label: "📁 Enviar Vídeo" }, { id: "url", label: "🔗 URL do Vídeo" }].map((m) => (
+          <button key={m.id} onClick={() => { setMode(m.id); setAnalysis(null); setFile(null); setPreview(null); setVideoUrl(""); }}
+            style={{ flex: 1, padding: "9px 14px", borderRadius: 10, border: `1.5px solid ${mode === m.id ? "#fe2c55" : "rgba(255,255,255,0.1)"}`, background: mode === m.id ? "rgba(254,44,85,0.12)" : "transparent", color: mode === m.id ? "#fe2c55" : "rgba(255,255,255,0.4)", fontWeight: mode === m.id ? 700 : 500, fontSize: 13, cursor: "pointer", transition: "all 0.2s", fontFamily: "'Sora', sans-serif" }}>
+            {m.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Upload area */}
+      {mode === "upload" && (
+        <div
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={handleDrop}
+          onClick={() => !file && inputRef.current?.click()}
+          style={{ border: `2px dashed ${dragOver ? "#fe2c55" : file ? "rgba(78,205,196,0.4)" : "rgba(255,255,255,0.12)"}`, borderRadius: 14, padding: file ? "14px" : "40px 20px", textAlign: "center", cursor: file ? "default" : "pointer", transition: "all 0.2s", background: dragOver ? "rgba(254,44,85,0.05)" : "rgba(255,255,255,0.02)", marginBottom: 14 }}>
+          <input ref={inputRef} type="file" accept="video/*" style={{ display: "none" }} onChange={(e) => handleFile(e.target.files[0])} />
+
+          {!file ? (
+            <>
+              <div style={{ fontSize: 36, marginBottom: 10 }}>🎬</div>
+              <p style={{ margin: "0 0 6px", fontSize: 14, fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>
+                Arraste o vídeo aqui ou clique para selecionar
+              </p>
+              <p style={{ margin: 0, fontSize: 12, color: "rgba(255,255,255,0.3)" }}>
+                MP4, MOV, AVI · Reels, TikToks, Shorts
+              </p>
+            </>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              {preview && (
+                <video src={preview} style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 8, flexShrink: 0 }} muted />
+              )}
+              <div style={{ flex: 1, textAlign: "left" }}>
+                <p style={{ margin: "0 0 3px", fontSize: 13, fontWeight: 600, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file.name}</p>
+                <p style={{ margin: 0, fontSize: 12, color: "rgba(255,255,255,0.35)" }}>{(file.size / 1024 / 1024).toFixed(1)} MB</p>
+              </div>
+              <button onClick={(e) => { e.stopPropagation(); setFile(null); setPreview(null); setAnalysis(null); }}
+                style={{ background: "rgba(254,44,85,0.15)", border: "none", color: "#fe2c55", borderRadius: 8, padding: "5px 10px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
+                ✕ Trocar
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* URL input */}
+      {mode === "url" && (
+        <div style={{ marginBottom: 14 }}>
+          <input
+            value={videoUrl}
+            onChange={(e) => setVideoUrl(e.target.value)}
+            placeholder="https://www.tiktok.com/@... ou https://youtube.com/shorts/..."
+            style={{ width: "100%", padding: "12px 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, color: "#fff", fontSize: 13, fontFamily: "'Space Mono', monospace", outline: "none", boxSizing: "border-box" }}
+          />
+          <p style={{ margin: "6px 0 0", fontSize: 11, color: "rgba(255,255,255,0.25)" }}>
+            * Para URLs, o Gemini analisa com base no contexto disponível
+          </p>
+        </div>
+      )}
+
+      {/* Analyze button */}
+      <button
+        onClick={analyze}
+        disabled={!canAnalyze || loading}
+        style={{ width: "100%", padding: "14px", borderRadius: 12, border: "none", background: canAnalyze && !loading ? "linear-gradient(135deg, #fe2c55, #ff7b00)" : "rgba(255,255,255,0.06)", color: canAnalyze && !loading ? "#fff" : "rgba(255,255,255,0.2)", fontSize: 15, fontWeight: 700, cursor: canAnalyze && !loading ? "pointer" : "not-allowed", fontFamily: "'Sora', sans-serif", transition: "all 0.2s", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 20 }}>
+        {loading ? (
+          <>
+            <span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>⟳</span>
+            {progress || "Analisando vídeo..."}
+          </>
+        ) : "🔥 Analisar Potencial Viral"}
+      </button>
+
+      {/* Results */}
+      {analysis && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+
+          {/* Score principal */}
+          <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: "20px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+            <div style={{ flex: 1 }}>
+              <p style={{ margin: "0 0 4px", fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "'Space Mono', monospace", letterSpacing: 1 }}>POTENCIAL VIRAL</p>
+              <p style={{ margin: "0 0 10px", fontSize: 15, fontWeight: 600, color: "#fff", lineHeight: 1.4 }}>{analysis.verdict}</p>
+              {analysis.bestPlatform && (
+                <span style={{ fontSize: 12, color: "#fe2c55", background: "rgba(254,44,85,0.12)", border: "1px solid rgba(254,44,85,0.25)", borderRadius: 20, padding: "3px 10px", fontWeight: 600 }}>
+                  🎯 {analysis.bestPlatform}
+                </span>
+              )}
+            </div>
+            <CircularScore score={analysis.viralScore} size={110} />
+          </div>
+
+          {/* Alcance estimado + horário */}
+          {(analysis.estimatedReach || analysis.bestPostTime) && (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              {analysis.estimatedReach && (
+                <div style={{ background: "rgba(78,205,196,0.07)", border: "1px solid rgba(78,205,196,0.2)", borderRadius: 10, padding: "10px 12px" }}>
+                  <p style={{ margin: "0 0 4px", fontSize: 10, fontWeight: 700, color: "#4ecdc4", letterSpacing: "0.08em" }}>📊 ALCANCE EST.</p>
+                  <p style={{ margin: 0, fontSize: 12, color: "rgba(255,255,255,0.7)", lineHeight: 1.4 }}>{analysis.estimatedReach}</p>
+                </div>
+              )}
+              {analysis.bestPostTime && (
+                <div style={{ background: "rgba(255,180,0,0.07)", border: "1px solid rgba(255,180,0,0.2)", borderRadius: 10, padding: "10px 12px" }}>
+                  <p style={{ margin: "0 0 4px", fontSize: 10, fontWeight: 700, color: "#ff7b00", letterSpacing: "0.08em" }}>🕐 MELHOR HORÁRIO</p>
+                  <p style={{ margin: 0, fontSize: 12, color: "rgba(255,255,255,0.7)", lineHeight: 1.4 }}>{analysis.bestPostTime}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Scores por critério */}
+          {analysis.scores && (
+            <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "14px 16px" }}>
+              <p style={{ margin: "0 0 12px", fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.35)", fontFamily: "'Space Mono', monospace", letterSpacing: 1 }}>BREAKDOWN</p>
+              {Object.entries(analysis.scores).map(([key, val]) => (
+                <div key={key} style={{ marginBottom: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                    <span style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>{scoreLabels[key] || key}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: val >= 8 ? "#4ecdc4" : val >= 6 ? "#ffc107" : "#fe2c55", fontFamily: "'Space Mono', monospace" }}>{val}/10</span>
+                  </div>
+                  <HeatBar value={val * 10} size="sm" />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Hook suggestion */}
+          {analysis.hookSuggestion && (
+            <div style={{ background: "rgba(254,44,85,0.07)", border: "1px solid rgba(254,44,85,0.2)", borderRadius: 10, padding: "12px 14px" }}>
+              <p style={{ margin: "0 0 6px", fontSize: 10, fontWeight: 700, color: "#fe2c55", letterSpacing: "0.08em" }}>🪝 GANCHO SUGERIDO</p>
+              <p style={{ margin: 0, fontSize: 13, color: "rgba(255,255,255,0.8)", lineHeight: 1.5, fontStyle: "italic" }}>"{analysis.hookSuggestion}"</p>
+            </div>
+          )}
+
+          {/* Pontos fortes */}
+          {analysis.strengths?.length > 0 && (
+            <div style={{ background: "rgba(78,205,196,0.06)", border: "1px solid rgba(78,205,196,0.15)", borderRadius: 10, padding: "12px 14px" }}>
+              <p style={{ margin: "0 0 8px", fontSize: 11, fontWeight: 700, color: "#4ecdc4", letterSpacing: "0.08em" }}>✅ PONTOS FORTES</p>
+              {analysis.strengths.map((s, i) => <p key={i} style={{ margin: "0 0 4px", fontSize: 13, color: "rgba(255,255,255,0.7)", lineHeight: 1.4 }}>• {s}</p>)}
+            </div>
+          )}
+
+          {/* Melhorias */}
+          {analysis.improvements?.length > 0 && (
+            <div style={{ background: "rgba(255,123,0,0.06)", border: "1px solid rgba(255,123,0,0.15)", borderRadius: 10, padding: "12px 14px" }}>
+              <p style={{ margin: "0 0 8px", fontSize: 11, fontWeight: 700, color: "#ff7b00", letterSpacing: "0.08em" }}>⚡ O QUE MELHORAR</p>
+              {analysis.improvements.map((s, i) => <p key={i} style={{ margin: "0 0 4px", fontSize: 13, color: "rgba(255,255,255,0.7)", lineHeight: 1.4 }}>• {s}</p>)}
+            </div>
+          )}
+
+          {/* Analisar outro */}
+          <button onClick={() => { setFile(null); setPreview(null); setVideoUrl(""); setAnalysis(null); }}
+            style={{ padding: "10px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "rgba(255,255,255,0.4)", fontSize: 13, cursor: "pointer", fontFamily: "'Sora', sans-serif" }}>
+            ↩ Analisar outro vídeo
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─── Main App ─── */
 
 const TOOLS = [
@@ -879,6 +1165,7 @@ const TOOLS = [
   { id: "ideas", label: "Gerador de Ideias", icon: "💡", description: "5 ideias virais para qualquer nicho" },
   { id: "captions", label: "Legendas IA", icon: "✍️", description: "Legendas que geram engajamento" },
   { id: "thumbnail", label: "Análise Thumbnail", icon: "🖼️", description: "Score e feedback da sua thumbnail" },
+  { id: "video", label: "Analisar Vídeo", icon: "🎬", description: "Envie um vídeo e veja seu potencial viral" },
 ];
 
 export default function ViralToolkit() {
@@ -960,6 +1247,7 @@ export default function ViralToolkit() {
         {activeTool === "ideas" && <ContentIdeasGenerator />}
         {activeTool === "captions" && <CaptionGenerator />}
         {activeTool === "thumbnail" && <ThumbnailAnalyzer />}
+        {activeTool === "video" && <VideoAnalyzer />}
       </div>
     </div>
   );
