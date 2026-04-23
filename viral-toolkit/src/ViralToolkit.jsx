@@ -171,7 +171,7 @@ function imageToBase64(file) {
         if (w > maxW) { h = Math.round(h * (maxW / w)); w = maxW; }
         canvas.width = w; canvas.height = h;
         canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL("image/jpeg", 0.4));
+        resolve(canvas.toDataURL("image/jpeg", 0.7));
       };
       img.onerror = () => reject(new Error("Erro ao processar imagem."));
       img.src = reader.result;
@@ -254,7 +254,7 @@ function startExtraction(video, url, duration, count, timeout, resolve, reject, 
       const isBlank = sample[0] === 0 && sample[1] === 0 && sample[2] === 0;
 
       if (!isBlank) {
-        frames.push({ time: times[idx], dataUrl: canvas.toDataURL("image/jpeg", 0.4) });
+        frames.push({ time: times[idx], dataUrl: canvas.toDataURL("image/jpeg", 0.65) });
       }
     } catch (e) { /* skip frame */ }
     idx++;
@@ -311,8 +311,8 @@ function startExtraction(video, url, duration, count, timeout, resolve, reject, 
 }
 
 /* ─── AI Analysis ─── */
-async function analyzeWithAI(imageDataUrls, contextInfo) {
-const prompt = `Você é um analista sênior de conteúdo viral com 10 anos de experiência em redes sociais brasileiras. Sua especialidade é prever viralização com alta precisão.
+async function analyzeWithAI(imageDataUrls, contextInfo, model) {
+  const prompt = `Você é um analista sênior de conteúdo viral com 10 anos de experiência em redes sociais brasileiras. Sua especialidade é prever viralização com alta precisão.
 
 REGRAS DE PONTUAÇÃO (siga rigorosamente):
 - Nota 9-10: Excepcional. Só dê se o critério for claramente forte. Elementos que geram milhões de views.
@@ -321,7 +321,7 @@ REGRAS DE PONTUAÇÃO (siga rigorosamente):
 - Nota 3-4: Fraco. Precisa de melhorias significativas.
 - Nota 1-2: Muito fraco. Quase inexistente.
 
-IMPORTANTE: Não dê notas "seguras" no meio. Seja ousado. Um vídeo viral real deve ter pelo menos 2-3 critérios acima de 8. Um vídeo mediano deve ter notas abaixo de 5 em vários critérios. Diferencie claramente.
+IMPORTANTE: Não dê notas "seguras" no meio. Seja ousado e use a escala TODA. Um vídeo viral real deve ter pelo menos 2-3 critérios acima de 8. Um vídeo mediano deve ter notas abaixo de 5 em vários critérios. Diferencie claramente.
 
 Analise estes ${imageDataUrls.length} frames sequenciais de um vídeo e avalie:
 ${contextInfo ? "Contexto do criador: " + contextInfo : ""}
@@ -331,7 +331,7 @@ CRITÉRIOS:
 2. trend (peso 15%) - TENDÊNCIA: O tema está em ALTA AGORA nas redes? Temas genéricos (motivação, empreendedorismo) = máximo 5. Temas específicos do momento (polêmica atual, trend específica, formato viral do momento) = 7+.
 3. emotion (peso 18%) - EMOÇÃO: Provoca reação FORTE? Riso, indignação, choque, inveja, nostalgia? Se for apenas "interessante" = máximo 5. Se fizer a pessoa PARAR de scrollar = 8+.
 4. shareable (peso 15%) - COMPARTILHÁVEL: A pessoa VAI marcar alguém ou enviar no grupo? "Isso é a cara do fulano" = 9. "Interessante" = 4. Conteúdo que gera debate = 8+.
-5. duration (peso 8%) - DURAÇÃO: 7-15s = 9-10. 15-30s = 7-8. 30-60s = 5-6. 60s+ = 3-4.
+5. duration (peso 8%) - DURAÇÃO: 7-15s ideal = 9-10. 15-30s = 7-8. 30-60s = 5-6. 60s+ = 3-4.
 6. audio (peso 10%) - ÁUDIO: Só consigo avaliar pelo visual. Se parece usar formato trending (lip sync, dueto, remix) = 7+. Se parece ser só fala normal sem música = 3-4. Se não dá pra saber = 5.
 7. retention (peso 14%) - RETENÇÃO: Os frames mostram progressão visual? Tem plot twist, revelação, antes/depois? Se todos os frames parecem iguais = 3-4. Se tem variação clara e motivo pra assistir até o fim = 8+.
 
@@ -344,6 +344,7 @@ Responda SOMENTE com JSON válido, sem markdown, sem backticks, sem texto antes 
     body: JSON.stringify({
       images: imageDataUrls,
       prompt: prompt,
+      model: model || "smart",
     }),
   });
   const data = await response.json();
@@ -390,6 +391,7 @@ export default function ViralToolkit() {
   const [errorMsg, setErrorMsg] = useState("");
   const [predictorMode, setPredictorMode] = useState("ai");
   const [uploadMode, setUploadMode] = useState("video"); // video | images
+  const [aiModel, setAiModel] = useState("smart"); // smart | fast
   const [dragOver, setDragOver] = useState(false);
   const [videoPreview, setVideoPreview] = useState(null);
   const [videoFileName, setVideoFileName] = useState("");
@@ -489,7 +491,7 @@ export default function ViralToolkit() {
     try {
       setAnalysisState("analyzing");
       setErrorMsg("");
-      const result = await analyzeWithAI(uploadedImages, contextInfo);
+      const result = await analyzeWithAI(uploadedImages, contextInfo, aiModel);
       setAiResult(result);
       setAnalysisState("done");
     } catch (err) {
@@ -603,7 +605,7 @@ export default function ViralToolkit() {
                 {analysisState !== "done" && (
                   <>
                     {/* Upload mode toggle */}
-                    <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+                    <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
                       {[{id:"video",label:"🎬 Enviar vídeo"},{id:"images",label:"📸 Enviar prints"}].map(m => (
                         <button key={m.id} onClick={() => { setUploadMode(m.id); resetAll(); }} style={{
                           flex: 1, padding: "10px 12px", borderRadius: 10,
@@ -612,6 +614,22 @@ export default function ViralToolkit() {
                           color: uploadMode===m.id ? "#fe2c55" : "rgba(255,255,255,0.5)",
                           fontFamily: "'Sora', sans-serif", fontSize: 12, fontWeight: 600, cursor: "pointer",
                         }}>{m.label}</button>
+                      ))}
+                    </div>
+
+                    {/* Model selector */}
+                    <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+                      {[{id:"smart",label:"🧠 Preciso",desc:"Gemini 2.5 Flash · 20/min"},{id:"fast",label:"⚡ Rápido",desc:"Gemini 2.0 Flash · 1500/dia"}].map(m => (
+                        <button key={m.id} onClick={() => setAiModel(m.id)} style={{
+                          flex: 1, padding: "10px 12px", borderRadius: 10,
+                          border: aiModel===m.id ? "1px solid #4ecdc4" : "1px solid rgba(255,255,255,0.1)",
+                          background: aiModel===m.id ? "rgba(78,205,196,0.1)" : "rgba(255,255,255,0.03)",
+                          color: aiModel===m.id ? "#4ecdc4" : "rgba(255,255,255,0.5)",
+                          fontFamily: "'Sora', sans-serif", fontSize: 11, fontWeight: 600, cursor: "pointer",
+                        }}>
+                          <div>{m.label}</div>
+                          <div style={{ fontSize: 9, marginTop: 2, opacity: 0.7 }}>{m.desc}</div>
+                        </button>
                       ))}
                     </div>
 

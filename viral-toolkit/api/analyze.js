@@ -1,3 +1,7 @@
+// api/analyze.js
+// Vercel Serverless Function — proxy para Google Gemini (grátis)
+// Suporta 2 modelos: gemini-2.5-flash (preciso) e gemini-2.0-flash (rápido)
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -10,26 +14,25 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { images, prompt } = req.body;
+    const { images, prompt, model } = req.body;
 
     if (!images || images.length === 0) {
-      return res.status(400).json({ error: "Nenhuma imagem recebida. images=" + typeof images });
+      return res.status(400).json({ error: "Nenhuma imagem recebida" });
     }
 
     const parts = [];
     for (let i = 0; i < images.length; i++) {
       const dataUrl = images[i];
       const base64Data = dataUrl.split(",")[1];
-      if (!base64Data) {
-        return res.status(400).json({ error: "Imagem " + (i+1) + " sem dados base64" });
-      }
+      if (!base64Data) continue;
       const mimeMatch = dataUrl.match(/data:(.*?);/);
       const mimeType = mimeMatch ? mimeMatch[1] : "image/jpeg";
       parts.push({ inline_data: { mime_type: mimeType, data: base64Data } });
     }
     parts.push({ text: prompt || "Descreva as imagens" });
 
-    const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + GEMINI_API_KEY;
+    const modelId = model === "fast" ? "gemini-2.0-flash" : "gemini-2.5-flash";
+    const url = "https://generativelanguage.googleapis.com/v1beta/models/" + modelId + ":generateContent?key=" + GEMINI_API_KEY;
 
     const geminiResponse = await fetch(url, {
       method: "POST",
@@ -52,7 +55,7 @@ export default async function handler(req, res) {
 
     if (!text) {
       return res.status(500).json({
-        error: "Gemini retornou vazio. Raw: " + JSON.stringify(data).slice(0, 300)
+        error: "Gemini retornou vazio. Tente novamente."
       });
     }
 
