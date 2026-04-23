@@ -1,1253 +1,885 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
-const FONTS_URL = "https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap";
+const FONTS_URL = "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap";
 
+/* ─── Design tokens ─── */
+const C = {
+  bg:          "#000000",
+  surface:     "#0a0a0a",
+  surfaceHover:"#111111",
+  border:      "#1c1c1c",
+  borderHover: "#2a2a2a",
+  blue:        "#2563eb",
+  blueHover:   "#3b82f6",
+  blueDim:     "rgba(37,99,235,0.12)",
+  blueBorder:  "rgba(37,99,235,0.45)",
+  text:        "#ffffff",
+  textMid:     "rgba(255,255,255,0.55)",
+  textDim:     "rgba(255,255,255,0.22)",
+  success:     "#22c55e",
+  warn:        "#f59e0b",
+  danger:      "#ef4444",
+};
+
+/* ─── Data ─── */
 const CATEGORIES = [
-  { id: "tech", label: "Tecnologia", icon: "⚡" },
+  { id: "tech",          label: "Tecnologia",    icon: "⚡" },
   { id: "entertainment", label: "Entretenimento", icon: "🎬" },
-  { id: "business", label: "Negócios", icon: "📈" },
-  { id: "health", label: "Saúde", icon: "💪" },
-  { id: "lifestyle", label: "Lifestyle", icon: "✨" },
-  { id: "education", label: "Educação", icon: "📚" },
-  { id: "gaming", label: "Games", icon: "🎮" },
-  { id: "food", label: "Gastronomia", icon: "🍕" },
+  { id: "business",      label: "Negócios",       icon: "📈" },
+  { id: "health",        label: "Saúde",          icon: "💪" },
+  { id: "lifestyle",     label: "Lifestyle",      icon: "✨" },
+  { id: "education",     label: "Educação",       icon: "📚" },
+  { id: "gaming",        label: "Games",          icon: "🎮" },
+  { id: "food",          label: "Gastronomia",    icon: "🍕" },
 ];
 
 const PLATFORMS = [
-  { id: "tiktok", label: "TikTok", color: "#fe2c55" },
-  { id: "instagram", label: "Instagram", color: "#E1306C" },
-  { id: "youtube", label: "YouTube", color: "#FF0000" },
-  { id: "twitter", label: "X / Twitter", color: "#1DA1F2" },
+  { id: "tiktok",    label: "TikTok"     },
+  { id: "instagram", label: "Instagram"  },
+  { id: "youtube",   label: "YouTube"    },
+  { id: "twitter",   label: "X / Twitter"},
 ];
 
 const VIRAL_CRITERIA = [
-  { id: "hook", label: "Gancho nos primeiros 3s", description: "Prende atenção imediatamente?", weight: 20 },
-  { id: "trend", label: "Tema em tendência", description: "Assunto em alta nas redes?", weight: 15 },
-  { id: "emotion", label: "Gatilho emocional", description: "Causa riso, choque, inspiração, curiosidade?", weight: 18 },
-  { id: "shareable", label: "Compartilhável", description: "Dá vontade de marcar alguém?", weight: 15 },
-  { id: "duration", label: "Duração otimizada", description: "Tempo ideal para a plataforma?", weight: 8 },
-  { id: "audio", label: "Áudio/Música trending", description: "Usa áudio popular do momento?", weight: 10 },
-  { id: "retention", label: "Retenção até o final", description: "Motivo para assistir até o fim?", weight: 14 },
+  { id: "hook",      label: "Gancho nos primeiros 3s",        description: "Prende atenção imediatamente?",               weight: 20 },
+  { id: "trend",     label: "Tema em tendência",               description: "Assunto em alta nas redes?",                  weight: 15 },
+  { id: "emotion",   label: "Gatilho emocional",               description: "Causa riso, choque, inspiração, curiosidade?", weight: 18 },
+  { id: "shareable", label: "Compartilhável",                  description: "Dá vontade de marcar alguém?",                weight: 15 },
+  { id: "duration",  label: "Duração otimizada",               description: "Tempo ideal para a plataforma?",              weight: 8  },
+  { id: "audio",     label: "Áudio/Música trending",           description: "Usa áudio popular do momento?",               weight: 10 },
+  { id: "retention", label: "Retenção até o final",            description: "Motivo para assistir até o fim?",             weight: 14 },
 ];
 
-/* ─── Utility Components ─── */
+const TOOLS = [
+  { id: "radar",     label: "Radar de Tendências", description: "Trends reais por nicho e plataforma"        },
+  { id: "video",     label: "Analisar Vídeo",       description: "Envie um vídeo e veja seu potencial viral"  },
+  { id: "viral",     label: "Score Viral",          description: "Avalie o potencial viral do seu conteúdo"   },
+  { id: "ideas",     label: "Gerador de Ideias",    description: "5 ideias virais para qualquer nicho"         },
+  { id: "captions",  label: "Legendas IA",          description: "Legendas que geram engajamento"              },
+  { id: "thumbnail", label: "Análise Thumbnail",    description: "Score e feedback da sua thumbnail"           },
+];
 
-function HeatBar({ value, size = "md" }) {
-  const color = value >= 90 ? "#fe2c55" : value >= 75 ? "#ff7b00" : value >= 60 ? "#ffc107" : "#4ecdc4";
-  const h = size === "sm" ? 6 : 8;
+/* ════════════════════════════════════════════
+   PRIMITIVES
+════════════════════════════════════════════ */
+
+function Bar({ value }) {
   return (
-    <div style={{ width: "100%", height: h, borderRadius: h, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
-      <div style={{ width: `${value}%`, height: "100%", borderRadius: h, background: `linear-gradient(90deg, ${color}88, ${color})`, transition: "width 1s cubic-bezier(.4,0,.2,1)" }} />
+    <div style={{ width: "100%", height: 3, borderRadius: 3, background: C.border }}>
+      <div style={{ width: `${value}%`, height: "100%", borderRadius: 3, background: C.blue, transition: "width 0.8s cubic-bezier(.4,0,.2,1)" }} />
     </div>
   );
 }
 
-function TimingBadge({ timing }) {
-  const map = {
-    "AGORA": { bg: "#fe2c5522", color: "#fe2c55", border: "#fe2c5544", pulse: true },
-    "SUBINDO": { bg: "#ff7b0022", color: "#ff7b00", border: "#ff7b0044" },
-    "ESTÁVEL": { bg: "#4ecdc422", color: "#4ecdc4", border: "#4ecdc444" },
-  };
-  const s = map[timing] || map["ESTÁVEL"];
+function ScoreRing({ score, size = 100 }) {
+  const stroke = 2.5, r = (size - stroke) / 2, circ = 2 * Math.PI * r;
+  const offset = circ - (score / 100) * circ;
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, fontFamily: "'Space Mono', monospace", background: s.bg, color: s.color, border: `1px solid ${s.border}`, letterSpacing: 1 }}>
-      {s.pulse && <span style={{ width: 6, height: 6, borderRadius: "50%", background: s.color, animation: "pulse 1.5s infinite" }} />}
-      {timing}
+    <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+      <svg width={size} height={size} style={{ transform: "rotate(-90deg)", position: "absolute" }}>
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={C.border} strokeWidth={stroke} />
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={C.blue} strokeWidth={stroke}
+          strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
+          style={{ transition: "stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1)" }} />
+      </svg>
+      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+        <span style={{ fontSize: Math.round(size * 0.25), fontWeight: 700, color: C.text, lineHeight: 1, fontFamily: "'JetBrains Mono', monospace" }}>{score}</span>
+        <span style={{ fontSize: 9, color: C.textDim, fontFamily: "'JetBrains Mono', monospace" }}>/100</span>
+      </div>
+    </div>
+  );
+}
+
+function Chip({ children, active, onClick }) {
+  return (
+    <button onClick={onClick}
+      style={{ padding: "5px 11px", borderRadius: 4, border: `1px solid ${active ? C.blueBorder : C.border}`, background: active ? C.blueDim : "transparent", color: active ? C.blue : C.textDim, fontSize: 12, fontWeight: active ? 500 : 400, cursor: "pointer", transition: "all 0.12s", whiteSpace: "nowrap", fontFamily: "'Inter', sans-serif" }}>
+      {children}
+    </button>
+  );
+}
+
+function PrimaryBtn({ children, onClick, disabled, fullWidth }) {
+  return (
+    <button onClick={onClick} disabled={disabled}
+      style={{ width: fullWidth ? "100%" : undefined, padding: "10px 18px", borderRadius: 6, border: "none", background: disabled ? C.surface : C.blue, color: disabled ? C.textDim : C.text, fontSize: 13, fontWeight: 500, cursor: disabled ? "not-allowed" : "pointer", transition: "all 0.15s", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, fontFamily: "'Inter', sans-serif", border: `1px solid ${disabled ? C.border : "transparent"}` }}>
+      {children}
+    </button>
+  );
+}
+
+function GhostBtn({ children, onClick }) {
+  return (
+    <button onClick={onClick}
+      style={{ padding: "7px 12px", borderRadius: 5, border: `1px solid ${C.border}`, background: "transparent", color: C.textMid, fontSize: 12, cursor: "pointer", transition: "all 0.12s", display: "flex", alignItems: "center", gap: 6, fontFamily: "'Inter', sans-serif" }}>
+      {children}
+    </button>
+  );
+}
+
+function Card({ children, style }) {
+  return (
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: "14px", ...style }}>
+      {children}
+    </div>
+  );
+}
+
+function Label({ children }) {
+  return (
+    <span style={{ fontSize: 10, fontWeight: 600, color: C.textDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+      {children}
     </span>
   );
 }
 
-function CircularScore({ score, size = 160 }) {
-  const stroke = 10, radius = (size - stroke) / 2, circ = 2 * Math.PI * radius, offset = circ - (score / 100) * circ;
-  const color = score >= 80 ? "#fe2c55" : score >= 60 ? "#ff7b00" : score >= 40 ? "#ffc107" : "#4ecdc4";
-  const label = score >= 80 ? "ALTO POTENCIAL" : score >= 60 ? "BOM POTENCIAL" : score >= 40 ? "POTENCIAL MÉDIO" : "BAIXO POTENCIAL";
+function CopyBtn({ text }) {
+  const [ok, setOk] = useState(false);
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-      <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
-        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={stroke} />
-        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={color} strokeWidth={stroke} strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round" style={{ transition: "stroke-dashoffset 1.5s cubic-bezier(.4,0,.2,1)", filter: `drop-shadow(0 0 8px ${color}66)` }} />
-        <text x={size / 2} y={size / 2 - 6} textAnchor="middle" dominantBaseline="central" fill={color} fontSize={size * 0.28} fontWeight={800} fontFamily="'Sora', sans-serif" style={{ transform: "rotate(90deg)", transformOrigin: "center" }}>{score}</text>
-        <text x={size / 2} y={size / 2 + 20} textAnchor="middle" dominantBaseline="central" fill="rgba(255,255,255,0.5)" fontSize={10} fontFamily="'Space Mono', monospace" style={{ transform: "rotate(90deg)", transformOrigin: "center" }}>/100</text>
-      </svg>
-      <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 700, color, letterSpacing: 2, padding: "4px 12px", borderRadius: 20, background: `${color}15`, border: `1px solid ${color}33` }}>{label}</span>
+    <button onClick={() => { navigator.clipboard.writeText(text); setOk(true); setTimeout(() => setOk(false), 2000); }}
+      style={{ padding: "3px 9px", borderRadius: 4, border: `1px solid ${ok ? C.success + "66" : C.border}`, background: "transparent", color: ok ? C.success : C.textDim, fontSize: 10, cursor: "pointer", fontFamily: "'JetBrains Mono', monospace", transition: "all 0.18s", flexShrink: 0 }}>
+      {ok ? "✓" : "copy"}
+    </button>
+  );
+}
+
+function FieldInput({ value, onChange, placeholder, mono }) {
+  const [focus, setFocus] = useState(false);
+  return (
+    <input value={value} onChange={onChange} placeholder={placeholder}
+      onFocus={() => setFocus(true)} onBlur={() => setFocus(false)}
+      style={{ width: "100%", padding: "10px 12px", background: C.surface, border: `1px solid ${focus ? C.blueBorder : C.border}`, borderRadius: 6, color: C.text, fontSize: 13, fontFamily: mono ? "'JetBrains Mono', monospace" : "'Inter', sans-serif", outline: "none", boxSizing: "border-box", transition: "border-color 0.15s" }}
+    />
+  );
+}
+
+function FieldSelect({ value, onChange, children }) {
+  return (
+    <select value={value} onChange={onChange}
+      style={{ width: "100%", padding: "10px 12px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 6, color: C.text, fontSize: 13, fontFamily: "'Inter', sans-serif", outline: "none", cursor: "pointer" }}>
+      {children}
+    </select>
+  );
+}
+
+function Spin() { return <span style={{ display: "inline-block", animation: "spin 0.9s linear infinite" }}>↻</span>; }
+
+function Divider({ label }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 0" }}>
+      <div style={{ flex: 1, height: 1, background: C.border }} />
+      {label && <Label>{label}</Label>}
+      <div style={{ flex: 1, height: 1, background: C.border }} />
     </div>
   );
 }
 
-/* ─── Radar Chart Component ─── */
-
+/* ─── Radar chart (canvas) ─── */
 function RadarChart({ scores }) {
-  const canvasRef = useRef(null);
+  const ref = useRef(null);
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const canvas = ref.current; if (!canvas) return;
     const ctx = canvas.getContext("2d");
-    const W = canvas.width, H = canvas.height;
-    const cx = W / 2, cy = H / 2;
-    const radius = Math.min(cx, cy) - 50;
-    const labels = ["Gancho", "Tendência", "Emoção", "Compartilhável", "Duração", "Áudio", "Retenção"];
-    const ids = ["hook", "trend", "emotion", "shareable", "duration", "audio", "retention"];
-    const values = ids.map((id) => scores[id]?.score || 0);
-    const n = labels.length;
-    const step = (2 * Math.PI) / n;
-    const start = -Math.PI / 2;
+    const W = canvas.width, H = canvas.height, cx = W/2, cy = H/2;
+    const radius = Math.min(cx, cy) - 44;
+    const ids    = ["hook","trend","emotion","shareable","duration","audio","retention"];
+    const labels = ["Gancho","Tendência","Emoção","Compartilhável","Duração","Áudio","Retenção"];
+    const values = ids.map(id => scores[id]?.score || 0);
+    const n = ids.length, step = (2*Math.PI)/n, start = -Math.PI/2;
     ctx.clearRect(0, 0, W, H);
     for (let ring = 2; ring <= 10; ring += 2) {
       ctx.beginPath();
-      for (let i = 0; i <= n; i++) { const a = start + i * step; const r = (ring / 10) * radius; const x = cx + r * Math.cos(a); const y = cy + r * Math.sin(a); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
-      ctx.closePath(); ctx.strokeStyle = "rgba(255,255,255,0.08)"; ctx.lineWidth = 1; ctx.stroke();
+      for (let i = 0; i <= n; i++) { const a = start+i*step, rl=(ring/10)*radius; i===0?ctx.moveTo(cx+rl*Math.cos(a),cy+rl*Math.sin(a)):ctx.lineTo(cx+rl*Math.cos(a),cy+rl*Math.sin(a)); }
+      ctx.closePath(); ctx.strokeStyle="rgba(255,255,255,0.05)"; ctx.lineWidth=1; ctx.stroke();
     }
-    for (let i = 0; i < n; i++) { const a = start + i * step; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + radius * Math.cos(a), cy + radius * Math.sin(a)); ctx.strokeStyle = "rgba(255,255,255,0.08)"; ctx.lineWidth = 1; ctx.stroke(); }
-    ctx.fillStyle = "rgba(255,255,255,0.2)"; ctx.font = "10px 'Space Mono', monospace"; ctx.textAlign = "center";
-    for (let ring = 2; ring <= 10; ring += 2) { ctx.fillText(ring.toString(), cx + 4, cy - (ring / 10) * radius + 4); }
-    const dataPoints = values.map((v, i) => { const a = start + i * step; const r = (v / 100) * radius; return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) }; });
-    ctx.beginPath();
-    dataPoints.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
-    ctx.closePath();
-    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
-    grad.addColorStop(0, "rgba(254,44,85,0.4)"); grad.addColorStop(1, "rgba(254,44,85,0.05)");
-    ctx.fillStyle = grad; ctx.fill();
-    ctx.strokeStyle = "#fe2c55"; ctx.lineWidth = 2; ctx.stroke();
-    dataPoints.forEach((p) => { ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, 2 * Math.PI); ctx.fillStyle = "#fe2c55"; ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5; ctx.stroke(); });
-    ctx.font = "bold 12px 'Sora', sans-serif";
-    labels.forEach((label, i) => {
-      const a = start + i * step; const r = radius + 28;
-      const x = cx + r * Math.cos(a); const y = cy + r * Math.sin(a);
-      ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.textAlign = "center"; ctx.fillText(label, x, y);
-    });
+    for (let i=0;i<n;i++){const a=start+i*step;ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+radius*Math.cos(a),cy+radius*Math.sin(a));ctx.strokeStyle="rgba(255,255,255,0.05)";ctx.lineWidth=1;ctx.stroke();}
+    const pts=values.map((v,i)=>{const a=start+i*step,rl=(v/100)*radius;return{x:cx+rl*Math.cos(a),y:cy+rl*Math.sin(a)};});
+    ctx.beginPath();pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));ctx.closePath();
+    ctx.fillStyle="rgba(37,99,235,0.14)";ctx.fill();ctx.strokeStyle=C.blue;ctx.lineWidth=1.5;ctx.stroke();
+    pts.forEach(p=>{ctx.beginPath();ctx.arc(p.x,p.y,3,0,2*Math.PI);ctx.fillStyle=C.blue;ctx.fill();});
+    ctx.font="11px 'Inter',sans-serif";ctx.fillStyle="rgba(255,255,255,0.35)";ctx.textAlign="center";
+    labels.forEach((lbl,i)=>{const a=start+i*step,rl=radius+22;ctx.fillText(lbl,cx+rl*Math.cos(a),cy+rl*Math.sin(a)+4);});
   }, [scores]);
-  return <canvas ref={canvasRef} width={360} height={360} style={{ maxWidth: "100%" }} />;
+  return <canvas ref={ref} width={300} height={300} style={{ maxWidth:"100%", display:"block", margin:"0 auto" }} />;
 }
 
-/* ─── Viral Score Checker ─── */
+/* ════════════════════════════════════════════
+   TOOL 1 — TREND RADAR
+════════════════════════════════════════════ */
 
-function ViralScoreChecker() {
-  const [scores, setScores] = useState({});
-  const [submitted, setSubmitted] = useState(false);
-  const totalScore = Math.round(
-    VIRAL_CRITERIA.reduce((acc, c) => acc + ((scores[c.id]?.score || 0) / 10) * c.weight, 0)
-  );
-  const handleScore = (id, value) => setScores((prev) => ({ ...prev, [id]: { score: value } }));
-  return (
-    <div>
-      <div style={{ display: "grid", gap: 12 }}>
-        {VIRAL_CRITERIA.map((c) => (
-          <div key={c.id} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "14px 16px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#fff", marginBottom: 2 }}>{c.label}</div>
-                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)" }}>{c.description}</div>
-              </div>
-              <span style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", fontFamily: "'Space Mono', monospace" }}>×{c.weight}</span>
+function useTrendData(niche) {
+  const [data,setData]=useState(null);
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState(null);
+  const [lastFetch,setLastFetch]=useState(null);
+  const fetch_=useCallback(async()=>{
+    setLoading(true);setError(null);
+    try{
+      const r=await fetch(`/api/trends?niche=${niche}`);
+      if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error||`HTTP ${r.status}`);}
+      setData(await r.json());setLastFetch(new Date());
+    }catch(e){setError(e.message);}finally{setLoading(false);}
+  },[niche]);
+  useEffect(()=>{fetch_();},[fetch_]);
+  useEffect(()=>{const t=setInterval(fetch_,30*60*1000);return()=>clearInterval(t);},[fetch_]);
+  return{data,loading,error,refetch:fetch_,lastFetch};
+}
+
+function TrendCard({trend,index}){
+  const[open,setOpen]=useState(false);
+  return(
+    <div onClick={()=>setOpen(!open)}
+      style={{background:open?C.surfaceHover:C.surface,border:`1px solid ${open?C.blueBorder:C.border}`,borderRadius:7,overflow:"hidden",cursor:"pointer",transition:"all 0.12s"}}>
+      <div style={{padding:"11px 13px"}}>
+        <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
+          <span style={{fontSize:11,color:C.textDim,fontFamily:"'JetBrains Mono',monospace",flexShrink:0,paddingTop:1}}>{String(index+1).padStart(2,"0")}</span>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:5}}>
+              <Chip active>{trend.timing}</Chip>
+              {trend.category&&<Chip>{trend.category}</Chip>}
             </div>
-            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-              {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => (
-                <button key={v} onClick={() => handleScore(c.id, v * 10)}
-                  style={{ width: 28, height: 28, borderRadius: 6, border: "1px solid", fontSize: 11, fontWeight: 700, cursor: "pointer", transition: "all 0.15s", borderColor: scores[c.id]?.score === v * 10 ? "#fe2c55" : "rgba(255,255,255,0.12)", background: scores[c.id]?.score === v * 10 ? "#fe2c55" : "transparent", color: scores[c.id]?.score === v * 10 ? "#fff" : "rgba(255,255,255,0.5)" }}>
+            <p style={{margin:"0 0 3px",fontSize:13,fontWeight:500,color:C.text,lineHeight:1.35}}>{trend.topic}</p>
+            {trend.description&&<p style={{margin:0,fontSize:12,color:C.textMid,lineHeight:1.4}}>{trend.description}</p>}
+          </div>
+          <div style={{flexShrink:0,textAlign:"right"}}>
+            <div style={{fontSize:16,fontWeight:700,color:C.text,fontFamily:"'JetBrains Mono',monospace",lineHeight:1}}>{trend.heat}</div>
+            {trend.growth&&<div style={{fontSize:10,color:C.blue,fontFamily:"'JetBrains Mono',monospace"}}>{trend.growth}</div>}
+          </div>
+        </div>
+        <div style={{marginTop:9}}><Bar value={trend.heat}/></div>
+      </div>
+      {open&&(
+        <div onClick={e=>e.stopPropagation()} style={{borderTop:`1px solid ${C.border}`,padding:"11px 13px",display:"flex",flexDirection:"column",gap:10}}>
+          {trend.hook&&(
+            <div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}><Label>Hook</Label><CopyBtn text={trend.hook}/></div>
+              <p style={{margin:0,fontSize:12,color:C.textMid,lineHeight:1.5}}>{trend.hook}</p>
+            </div>
+          )}
+          {trend.contentIdea&&(
+            <div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}><Label>Ideia de conteúdo</Label><CopyBtn text={trend.contentIdea}/></div>
+              <p style={{margin:0,fontSize:12,color:C.textMid,lineHeight:1.5}}>{trend.contentIdea}</p>
+            </div>
+          )}
+          {trend.tags?.length>0&&(
+            <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+              {trend.tags.map(t=><Chip key={t}>#{t}</Chip>)}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TrendRadarSection(){
+  const[cat,setCat]=useState("tech");
+  const[plat,setPlat]=useState(null);
+  const{data,loading,error,refetch,lastFetch}=useTrendData(cat);
+  const trends=data?.trends||[];
+  const filtered=plat?trends.filter(t=>(t.platforms||[]).includes(plat)):trends;
+  return(
+    <div>
+      <div style={{marginBottom:16}}>
+        <div style={{marginBottom:8}}><Label>Nicho</Label></div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+          {CATEGORIES.map(c=><Chip key={c.id} active={cat===c.id} onClick={()=>setCat(c.id)}>{c.icon} {c.label}</Chip>)}
+        </div>
+      </div>
+
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          {data&&!loading&&(
+            <><span style={{fontSize:10,color:C.textDim,fontFamily:"'JetBrains Mono',monospace"}}>heat</span>
+            <span style={{fontSize:15,fontWeight:700,color:C.text,fontFamily:"'JetBrains Mono',monospace"}}>{data.heatScore}<span style={{fontSize:10,color:C.textDim}}>/100</span></span>
+            {data.summary&&<span style={{fontSize:11,color:C.textDim,maxWidth:260,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{data.summary}</span>}</>
+          )}
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          {lastFetch&&<span style={{fontSize:10,color:C.textDim,fontFamily:"'JetBrains Mono',monospace"}}>{lastFetch.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}</span>}
+          <GhostBtn onClick={refetch}>{loading?<><Spin/> buscando</>:"↻ atualizar"}</GhostBtn>
+        </div>
+      </div>
+
+      {!loading&&trends.length>0&&(
+        <div style={{display:"flex",gap:5,marginBottom:12,overflowX:"auto"}}>
+          <Chip active={!plat} onClick={()=>setPlat(null)}>Todas</Chip>
+          {PLATFORMS.map(p=><Chip key={p.id} active={plat===p.id} onClick={()=>setPlat(plat===p.id?null:p.id)}>{p.label}</Chip>)}
+        </div>
+      )}
+
+      {loading&&(
+        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+          {[...Array(4)].map((_,i)=><div key={i} style={{height:72,borderRadius:7,background:C.surface,border:`1px solid ${C.border}`,animation:`pulse_ 1.4s ease-in-out ${i*0.1}s infinite`}}/>)}
+        </div>
+      )}
+
+      {error&&!loading&&(
+        <Card>
+          <p style={{margin:"0 0 4px",fontSize:13,color:C.danger}}>Erro ao buscar tendências</p>
+          <p style={{margin:"0 0 12px",fontSize:12,color:C.textDim}}>{error}</p>
+          <PrimaryBtn onClick={refetch}>Tentar novamente</PrimaryBtn>
+        </Card>
+      )}
+
+      {!loading&&!error&&(
+        <div style={{display:"flex",flexDirection:"column",gap:5}}>
+          {filtered.length===0
+            ?<p style={{fontSize:12,color:C.textDim,padding:"20px 0",textAlign:"center"}}>Nenhum trend para esta plataforma</p>
+            :filtered.map((t,i)=><TrendCard key={t.id||i} trend={t} index={i}/>)
+          }
+        </div>
+      )}
+
+      {!loading&&!error&&trends.length>0&&(
+        <p style={{marginTop:14,fontSize:10,color:C.textDim,textAlign:"center",fontFamily:"'JetBrains Mono',monospace"}}>gemini + google search · auto-refresh 30min</p>
+      )}
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════
+   TOOL 2 — VIDEO ANALYZER
+════════════════════════════════════════════ */
+
+function VideoAnalyzer(){
+  const[mode,setMode]=useState("upload");
+  const[file,setFile]=useState(null);
+  const[videoUrl,setVideoUrl]=useState("");
+  const[preview,setPreview]=useState(null);
+  const[analysis,setAnalysis]=useState(null);
+  const[loading,setLoading]=useState(false);
+  const[progress,setProgress]=useState("");
+  const[drag,setDrag]=useState(false);
+  const inputRef=useRef(null);
+
+  const handleFile=f=>{if(!f||!f.type.startsWith("video/"))return;setFile(f);setAnalysis(null);setPreview(URL.createObjectURL(f));};
+
+  const analyze=async()=>{
+    const apiKey=import.meta.env.VITE_GEMINI_API_KEY;
+    if(!apiKey){alert("VITE_GEMINI_API_KEY não configurada");return;}
+    setLoading(true);setAnalysis(null);
+    try{
+      let base64=null,mimeType="video/mp4";
+      if(mode==="upload"&&file){
+        setProgress("carregando vídeo...");
+        mimeType=file.type||"video/mp4";
+        base64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(",")[1]);r.onerror=rej;r.readAsDataURL(file);});
+      }
+      setProgress("analisando...");
+      const prompt=`Analise este vídeo para redes sociais brasileiras. Avalie o potencial viral.
+Responda SOMENTE com JSON:
+{"viralScore":<0-100>,"verdict":"frase curta","scores":{"hook":<0-10>,"emotion":<0-10>,"retention":<0-10>,"shareable":<0-10>,"trend":<0-10>,"audio":<0-10>,"editing":<0-10>},"strengths":["p1","p2","p3"],"improvements":["m1","m2","m3"],"bestPlatform":"plataforma","estimatedReach":"ex: 10k–50k views","hookSuggestion":"gancho sugerido","bestPostTime":"horário ideal"}`;
+      const parts=base64?[{inlineData:{mimeType,data:base64}},{text:prompt}]:[{text:`URL: ${videoUrl}\n\n${prompt}`}];
+      const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({contents:[{parts}],generationConfig:{temperature:0.3,maxOutputTokens:2048}}),
+      });
+      const d=await r.json();
+      const raw=d?.candidates?.[0]?.content?.parts?.[0]?.text||"{}";
+      const m=raw.match(/\{[\s\S]*\}/);
+      if(m)setAnalysis(JSON.parse(m[0]));
+    }catch(e){alert("Erro: "+e.message);}
+    finally{setLoading(false);setProgress("");}
+  };
+
+  const sLabels={hook:"Gancho (3s)",emotion:"Emoção",retention:"Retenção",shareable:"Compartilhável",trend:"Tendência",audio:"Áudio",editing:"Edição"};
+  const canAnalyze=mode==="upload"?!!file:!!videoUrl.trim();
+
+  return(
+    <div>
+      <div style={{display:"flex",gap:5,marginBottom:16}}>
+        {[{id:"upload",label:"Enviar arquivo"},{id:"url",label:"Colar URL"}].map(m=>(
+          <Chip key={m.id} active={mode===m.id} onClick={()=>{setMode(m.id);setAnalysis(null);setFile(null);setPreview(null);setVideoUrl("");}}>
+            {m.label}
+          </Chip>
+        ))}
+      </div>
+
+      {mode==="upload"&&(
+        <div onDragOver={e=>{e.preventDefault();setDrag(true);}} onDragLeave={()=>setDrag(false)}
+          onDrop={e=>{e.preventDefault();setDrag(false);handleFile(e.dataTransfer.files[0]);}}
+          onClick={()=>!file&&inputRef.current?.click()}
+          style={{border:`1px dashed ${drag?C.blue:C.border}`,borderRadius:8,padding:file?"12px":"32px 20px",textAlign:"center",cursor:file?"default":"pointer",background:drag?C.blueDim:C.surface,marginBottom:14,transition:"all 0.15s"}}>
+          <input ref={inputRef} type="file" accept="video/*" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0])}/>
+          {!file?(
+            <>
+              <p style={{margin:"0 0 3px",fontSize:13,color:C.textMid}}>Arraste ou clique para selecionar</p>
+              <p style={{margin:0,fontSize:11,color:C.textDim}}>MP4 · MOV · AVI</p>
+            </>
+          ):(
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              {preview&&<video src={preview} style={{width:64,height:64,objectFit:"cover",borderRadius:5,flexShrink:0}} muted/>}
+              <div style={{flex:1,textAlign:"left"}}>
+                <p style={{margin:"0 0 2px",fontSize:13,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{file.name}</p>
+                <p style={{margin:0,fontSize:11,color:C.textDim}}>{(file.size/1024/1024).toFixed(1)} MB</p>
+              </div>
+              <button onClick={e=>{e.stopPropagation();setFile(null);setPreview(null);setAnalysis(null);}}
+                style={{border:`1px solid ${C.border}`,background:"transparent",color:C.textDim,borderRadius:4,padding:"4px 8px",fontSize:11,cursor:"pointer"}}>trocar</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {mode==="url"&&(
+        <div style={{marginBottom:14}}>
+          <FieldInput value={videoUrl} onChange={e=>setVideoUrl(e.target.value)} placeholder="https://www.tiktok.com/... ou youtube.com/shorts/..." mono/>
+        </div>
+      )}
+
+      <PrimaryBtn onClick={analyze} disabled={!canAnalyze||loading} fullWidth>
+        {loading?<><Spin/> {progress||"analisando..."}</>:"Analisar potencial viral"}
+      </PrimaryBtn>
+
+      {analysis&&(
+        <div style={{marginTop:18,display:"flex",flexDirection:"column",gap:10}}>
+          <Card style={{display:"flex",alignItems:"center",gap:16}}>
+            <ScoreRing score={analysis.viralScore} size={90}/>
+            <div>
+              <Label>Potencial viral</Label>
+              <p style={{margin:"5px 0 8px",fontSize:13,color:C.text,lineHeight:1.4}}>{analysis.verdict}</p>
+              {analysis.bestPlatform&&<Chip active>{analysis.bestPlatform}</Chip>}
+            </div>
+          </Card>
+
+          {(analysis.estimatedReach||analysis.bestPostTime)&&(
+            <Card>
+              {analysis.estimatedReach&&(
+                <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:`1px solid ${C.border}`}}>
+                  <span style={{fontSize:12,color:C.textMid}}>Alcance estimado</span>
+                  <span style={{fontSize:12,fontWeight:500,color:C.blue,fontFamily:"'JetBrains Mono',monospace"}}>{analysis.estimatedReach}</span>
+                </div>
+              )}
+              {analysis.bestPostTime&&(
+                <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0"}}>
+                  <span style={{fontSize:12,color:C.textMid}}>Melhor horário</span>
+                  <span style={{fontSize:12,fontWeight:500,color:C.blue,fontFamily:"'JetBrains Mono',monospace"}}>{analysis.bestPostTime}</span>
+                </div>
+              )}
+            </Card>
+          )}
+
+          {analysis.scores&&(
+            <Card>
+              <Label>Breakdown</Label>
+              <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:9}}>
+                {Object.entries(analysis.scores).map(([k,v])=>(
+                  <div key={k}>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                      <span style={{fontSize:12,color:C.textMid}}>{sLabels[k]||k}</span>
+                      <span style={{fontSize:11,fontWeight:600,color:C.text,fontFamily:"'JetBrains Mono',monospace"}}>{v}/10</span>
+                    </div>
+                    <Bar value={v*10}/>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {analysis.hookSuggestion&&(
+            <Card>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:7}}>
+                <Label>Gancho sugerido</Label><CopyBtn text={analysis.hookSuggestion}/>
+              </div>
+              <p style={{margin:0,fontSize:12,color:C.textMid,lineHeight:1.5,fontStyle:"italic"}}>"{analysis.hookSuggestion}"</p>
+            </Card>
+          )}
+
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+            {analysis.strengths?.length>0&&(
+              <Card>
+                <Label>Pontos fortes</Label>
+                <div style={{marginTop:7}}>{analysis.strengths.map((s,i)=><p key={i} style={{margin:"0 0 4px",fontSize:11,color:C.textMid,lineHeight:1.4}}>· {s}</p>)}</div>
+              </Card>
+            )}
+            {analysis.improvements?.length>0&&(
+              <Card>
+                <Label>Melhorar</Label>
+                <div style={{marginTop:7}}>{analysis.improvements.map((s,i)=><p key={i} style={{margin:"0 0 4px",fontSize:11,color:C.textMid,lineHeight:1.4}}>· {s}</p>)}</div>
+              </Card>
+            )}
+          </div>
+
+          <GhostBtn onClick={()=>{setFile(null);setPreview(null);setVideoUrl("");setAnalysis(null);}}>↩ Analisar outro vídeo</GhostBtn>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════
+   TOOL 3 — VIRAL SCORE
+════════════════════════════════════════════ */
+
+function ViralScoreChecker(){
+  const[scores,setScores]=useState({});
+  const total=Math.round(VIRAL_CRITERIA.reduce((acc,c)=>acc+((scores[c.id]?.score||0)/10)*c.weight,0));
+  const set=(id,v)=>setScores(p=>({...p,[id]:{score:v}}));
+  return(
+    <div>
+      <div style={{display:"flex",flexDirection:"column",gap:7,marginBottom:20}}>
+        {VIRAL_CRITERIA.map(c=>(
+          <Card key={c.id}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+              <div>
+                <p style={{margin:"0 0 2px",fontSize:13,fontWeight:500,color:C.text}}>{c.label}</p>
+                <p style={{margin:0,fontSize:11,color:C.textDim}}>{c.description}</p>
+              </div>
+              <span style={{fontSize:10,color:C.textDim,fontFamily:"'JetBrains Mono',monospace"}}>×{c.weight}</span>
+            </div>
+            <div style={{display:"flex",gap:3}}>
+              {[0,1,2,3,4,5,6,7,8,9,10].map(v=>(
+                <button key={v} onClick={()=>set(c.id,v*10)}
+                  style={{width:25,height:25,borderRadius:4,border:`1px solid ${scores[c.id]?.score===v*10?C.blue:C.border}`,background:scores[c.id]?.score===v*10?C.blueDim:"transparent",color:scores[c.id]?.score===v*10?C.blue:C.textDim,fontSize:11,fontWeight:600,cursor:"pointer",transition:"all 0.1s"}}>
                   {v}
                 </button>
               ))}
             </div>
-          </div>
-        ))}
-      </div>
-      {Object.keys(scores).length >= 4 && (
-        <div style={{ marginTop: 24, display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
-          <CircularScore score={totalScore} />
-          <RadarChart scores={scores} />
-          <button onClick={() => { setScores({}); setSubmitted(false); }}
-            style={{ padding: "10px 24px", borderRadius: 20, border: "1px solid rgba(255,255,255,0.2)", background: "transparent", color: "rgba(255,255,255,0.6)", fontSize: 13, cursor: "pointer" }}>
-            Resetar avaliação
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ─── TREND RADAR — DINÂMICO ─── */
-
-function useTrendData(niche) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [lastFetch, setLastFetch] = useState(null);
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/trends?niche=${niche}`);
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `HTTP ${res.status}`);
-      }
-      const json = await res.json();
-      setData(json);
-      setLastFetch(new Date());
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [niche]);
-
-  useEffect(() => { fetchData(); }, [fetchData]);
-
-  // Auto-refresh a cada 30 minutos
-  useEffect(() => {
-    const t = setInterval(fetchData, 30 * 60 * 1000);
-    return () => clearInterval(t);
-  }, [fetchData]);
-
-  return { data, loading, error, refetch: fetchData, lastFetch };
-}
-
-function TrendCardExpanded({ trend }) {
-  const [open, setOpen] = useState(false);
-  const [copied, setCopied] = useState(null);
-
-  const copy = (text, key) => {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(key);
-      setTimeout(() => setCopied(null), 2000);
-    });
-  };
-
-  const platColors = {
-    tiktok: "#fe2c55", instagram: "#E1306C", youtube: "#FF0000",
-    twitter: "#1DA1F2", linkedin: "#0077B5", multiplataforma: "#888",
-  };
-
-  const catColor = {
-    "Google Trends": "#4285F4",
-    "Notícia": "#EA4335",
-    "Vídeo Viral": "#FF0000",
-    "Hashtag": "#1DA1F2",
-    "Formato": "#7C3AED",
-  };
-
-  const color = trend.heat >= 90 ? "#fe2c55" : trend.heat >= 75 ? "#ff7b00" : trend.heat >= 60 ? "#ffc107" : "#4ecdc4";
-
-  return (
-    <div
-      onClick={() => setOpen(!open)}
-      style={{
-        background: "rgba(255,255,255,0.03)",
-        border: `1px solid ${open ? "rgba(254,44,85,0.3)" : "rgba(255,255,255,0.08)"}`,
-        borderRadius: 14,
-        overflow: "hidden",
-        cursor: "pointer",
-        transition: "border-color 0.2s, box-shadow 0.2s",
-        boxShadow: open ? "0 4px 24px rgba(254,44,85,0.12)" : "none",
-      }}
-    >
-      {/* ── Card header ── */}
-      <div style={{ padding: "14px 16px" }}>
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            {/* Meta row */}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
-              <TimingBadge timing={trend.timing} />
-              {trend.category && (
-                <span style={{ fontSize: 11, fontWeight: 600, color: catColor[trend.category] || "#aaa", background: `${catColor[trend.category] || "#aaa"}18`, border: `1px solid ${catColor[trend.category] || "#aaa"}33`, borderRadius: 20, padding: "3px 9px" }}>
-                  {trend.category}
-                </span>
-              )}
-              {(trend.platforms || []).map((pid) => {
-                const c = platColors[pid] || "#666";
-                const lbl = pid === "tiktok" ? "TikTok" : pid === "instagram" ? "Instagram" : pid === "youtube" ? "YouTube" : pid === "twitter" ? "X" : pid === "linkedin" ? "LinkedIn" : pid;
-                return (
-                  <span key={pid} style={{ fontSize: 11, fontWeight: 600, color: c, background: `${c}18`, border: `1px solid ${c}33`, borderRadius: 20, padding: "3px 9px" }}>
-                    {lbl}
-                  </span>
-                );
-              })}
-            </div>
-
-            <p style={{ margin: "0 0 6px", fontSize: 14, fontWeight: 700, color: "#fff", lineHeight: 1.35 }}>
-              {trend.topic}
-            </p>
-
-            {trend.description && (
-              <p style={{ margin: 0, fontSize: 12, color: "rgba(255,255,255,0.5)", lineHeight: 1.4 }}>
-                {trend.description}
-              </p>
-            )}
-          </div>
-
-          {/* Heat score */}
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, flexShrink: 0 }}>
-            <span style={{ fontSize: 22, fontWeight: 800, color, fontFamily: "'Sora', sans-serif", lineHeight: 1 }}>
-              {trend.heat}
-            </span>
-            <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", fontFamily: "'Space Mono', monospace", letterSpacing: 1 }}>HEAT</span>
-          </div>
-        </div>
-
-        {/* Heat bar + growth */}
-        <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ flex: 1 }}>
-            <HeatBar value={trend.heat} size="sm" />
-          </div>
-          {trend.growth && (
-            <span style={{ fontSize: 11, fontWeight: 700, color: "#4ecdc4", fontFamily: "'Space Mono', monospace", whiteSpace: "nowrap" }}>
-              {trend.growth}
-            </span>
-          )}
-          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>{open ? "▲" : "▼"}</span>
-        </div>
-      </div>
-
-      {/* ── Expansão: Hook + Ideia ── */}
-      {open && (
-        <div
-          onClick={(e) => e.stopPropagation()}
-          style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "14px 16px", display: "flex", flexDirection: "column", gap: 12 }}
-        >
-          {/* Hook */}
-          {trend.hook && (
-            <div style={{ background: "rgba(255,180,0,0.07)", border: "1px solid rgba(255,180,0,0.2)", borderRadius: 10, padding: "10px 12px" }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: "#ff7b00", letterSpacing: "0.08em", marginBottom: 6 }}>🪝 HOOK PRONTO</div>
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-                <p style={{ margin: 0, fontSize: 13, color: "rgba(255,255,255,0.85)", lineHeight: 1.5, flex: 1 }}>{trend.hook}</p>
-                <button
-                  onClick={() => copy(trend.hook, "hook")}
-                  style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: copied === "hook" ? "#4ecdc4" : "#ff7b00", background: copied === "hook" ? "rgba(78,205,196,0.15)" : "rgba(255,123,0,0.15)", border: "none", borderRadius: 6, padding: "5px 10px", cursor: "pointer" }}
-                >
-                  {copied === "hook" ? "✓ Copiado" : "📋 Copiar"}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Ideia de conteúdo */}
-          {trend.contentIdea && (
-            <div style={{ background: "rgba(78,205,196,0.07)", border: "1px solid rgba(78,205,196,0.2)", borderRadius: 10, padding: "10px 12px" }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: "#4ecdc4", letterSpacing: "0.08em", marginBottom: 6 }}>💡 IDEIA DE CONTEÚDO</div>
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-                <p style={{ margin: 0, fontSize: 13, color: "rgba(255,255,255,0.85)", lineHeight: 1.5, flex: 1 }}>{trend.contentIdea}</p>
-                <button
-                  onClick={() => copy(trend.contentIdea, "idea")}
-                  style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: copied === "idea" ? "#4ecdc4" : "#4ecdc4", background: "rgba(78,205,196,0.15)", border: "none", borderRadius: 6, padding: "5px 10px", cursor: "pointer" }}
-                >
-                  {copied === "idea" ? "✓ Copiado" : "📋 Copiar"}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Tags */}
-          {trend.tags?.length > 0 && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {trend.tags.map((tag) => (
-                <span key={tag} style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 20, padding: "3px 9px" }}>
-                  #{tag}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function TrendRadarSection() {
-  const [activeCategory, setActiveCategory] = useState("tech");
-  const [filterPlatform, setFilterPlatform] = useState(null);
-  const { data, loading, error, refetch, lastFetch } = useTrendData(activeCategory);
-
-  const trends = data?.trends || [];
-  const filtered = filterPlatform
-    ? trends.filter((t) => (t.platforms || []).includes(filterPlatform))
-    : trends;
-
-  return (
-    <div>
-      {/* Seletor de categoria */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
-        {CATEGORIES.map((c) => (
-          <button
-            key={c.id}
-            onClick={() => setActiveCategory(c.id)}
-            style={{
-              padding: "7px 14px", borderRadius: 99,
-              border: activeCategory === c.id ? "1.5px solid #fe2c55" : "1.5px solid rgba(255,255,255,0.12)",
-              background: activeCategory === c.id ? "rgba(254,44,85,0.12)" : "transparent",
-              color: activeCategory === c.id ? "#fe2c55" : "rgba(255,255,255,0.5)",
-              fontWeight: activeCategory === c.id ? 700 : 500,
-              fontSize: 13, cursor: "pointer", transition: "all 0.2s",
-              fontFamily: "'Sora', sans-serif",
-              display: "flex", alignItems: "center", gap: 5,
-            }}
-          >
-            {c.icon} {c.label}
-          </button>
+          </Card>
         ))}
       </div>
 
-      {/* Header com heat global + botão refresh */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          {data && !loading && (
-            <>
-              <span style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", fontFamily: "'Space Mono', monospace" }}>
-                HEAT GERAL
-              </span>
-              <span style={{ fontSize: 20, fontWeight: 800, color: data.heatScore >= 80 ? "#fe2c55" : data.heatScore >= 60 ? "#ff7b00" : "#ffc107", fontFamily: "'Sora', sans-serif" }}>
-                {data.heatScore}<span style={{ fontSize: 12, color: "rgba(255,255,255,0.3)" }}>/100</span>
-              </span>
-              {data.summary && (
-                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {data.summary}
-                </span>
-              )}
-            </>
-          )}
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {lastFetch && (
-            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.25)", fontFamily: "'Space Mono', monospace" }}>
-              {lastFetch.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-            </span>
-          )}
-          <button
-            onClick={refetch}
-            disabled={loading}
-            style={{
-              display: "flex", alignItems: "center", gap: 6,
-              padding: "7px 14px", borderRadius: 99,
-              border: "1.5px solid rgba(255,255,255,0.15)",
-              background: loading ? "rgba(255,255,255,0.03)" : "rgba(254,44,85,0.1)",
-              color: loading ? "rgba(255,255,255,0.25)" : "#fe2c55",
-              fontSize: 12, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer",
-              fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
-              transition: "all 0.2s", opacity: loading ? 0.5 : 1,
-            }}
-          >
-            <span style={loading ? { display: "inline-block", animation: "spin 1s linear infinite" } : {}}>⟳</span>
-            {loading ? "BUSCANDO..." : "ATUALIZAR"}
-          </button>
-        </div>
-      </div>
-
-      {/* Filtro por plataforma */}
-      {!loading && trends.length > 0 && (
-        <div style={{ display: "flex", gap: 6, marginBottom: 14, overflowX: "auto", paddingBottom: 4 }}>
-          <button
-            onClick={() => setFilterPlatform(null)}
-            style={{ flexShrink: 0, padding: "5px 12px", borderRadius: 99, fontSize: 11, fontWeight: 600, cursor: "pointer", border: `1.5px solid ${!filterPlatform ? "rgba(255,255,255,0.4)" : "rgba(255,255,255,0.1)"}`, background: !filterPlatform ? "rgba(255,255,255,0.08)" : "transparent", color: !filterPlatform ? "#fff" : "rgba(255,255,255,0.35)" }}
-          >
-            Todas
-          </button>
-          {PLATFORMS.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => setFilterPlatform(filterPlatform === p.id ? null : p.id)}
-              style={{ flexShrink: 0, padding: "5px 12px", borderRadius: 99, fontSize: 11, fontWeight: 600, cursor: "pointer", border: `1.5px solid ${filterPlatform === p.id ? p.color : "rgba(255,255,255,0.1)"}`, background: filterPlatform === p.id ? `${p.color}20` : "transparent", color: filterPlatform === p.id ? p.color : "rgba(255,255,255,0.35)" }}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Skeleton loading */}
-      {loading && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {[...Array(4)].map((_, i) => (
-            <div key={i} style={{ height: 100, borderRadius: 14, background: "rgba(255,255,255,0.04)", animation: `shimmer 1.4s ease-in-out ${i * 0.12}s infinite`, backgroundSize: "200% 100%" }} />
-          ))}
-          <style>{`@keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }`}</style>
-        </div>
-      )}
-
-      {/* Erro */}
-      {error && !loading && (
-        <div style={{ background: "rgba(254,44,85,0.08)", border: "1px solid rgba(254,44,85,0.25)", borderRadius: 14, padding: 20, textAlign: "center" }}>
-          <p style={{ margin: "0 0 6px", fontSize: 14, fontWeight: 600, color: "#fe2c55" }}>⚠️ Erro ao buscar tendências</p>
-          <p style={{ margin: "0 0 14px", fontSize: 12, color: "rgba(255,255,255,0.4)" }}>{error}</p>
-          <button onClick={refetch} style={{ padding: "8px 20px", borderRadius: 20, border: "1px solid #fe2c55", background: "rgba(254,44,85,0.15)", color: "#fe2c55", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-            Tentar novamente
-          </button>
-        </div>
-      )}
-
-      {/* Lista de trends */}
-      {!loading && !error && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {filtered.length === 0 ? (
-            <p style={{ textAlign: "center", color: "rgba(255,255,255,0.3)", fontSize: 14, padding: "30px 0" }}>
-              Nenhum trend para esta plataforma
-            </p>
-          ) : (
-            filtered.map((trend, i) => (
-              <TrendCardExpanded key={trend.id || i} trend={trend} />
-            ))
-          )}
-        </div>
-      )}
-
-      {/* Nota de rodapé */}
-      {!loading && !error && trends.length > 0 && (
-        <p style={{ marginTop: 16, fontSize: 11, color: "rgba(255,255,255,0.2)", textAlign: "center", fontFamily: "'Space Mono', monospace" }}>
-          Dados via Gemini + Google Search · Atualiza automaticamente a cada 30min
-        </p>
-      )}
-    </div>
-  );
-}
-
-/* ─── Content Ideas Generator ─── */
-
-function ContentIdeasGenerator() {
-  const [niche, setNiche] = useState("");
-  const [platform, setPlatform] = useState("tiktok");
-  const [format, setFormat] = useState("short");
-  const [ideas, setIdeas] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  const formats = [
-    { id: "short", label: "Short/Reels (< 60s)" },
-    { id: "long", label: "Vídeo longo (> 5min)" },
-    { id: "carousel", label: "Carrossel" },
-    { id: "story", label: "Story/Flick" },
-  ];
-
-  const generateIdeas = async () => {
-    if (!niche.trim()) return;
-    setLoading(true);
-    setIdeas([]);
-
-    try {
-      const prompt = `Gere 5 ideias criativas e virais de conteúdo para:
-Nicho: ${niche}
-Plataforma: ${PLATFORMS.find((p) => p.id === platform)?.label}
-Formato: ${formats.find((f) => f.id === format)?.label}
-
-Responda SOMENTE com um array JSON:
-[
-  {
-    "title": "Título chamativo do conteúdo",
-    "hook": "Primeiro texto/fala dos primeiros 3 segundos",
-    "structure": "Estrutura resumida: intro → desenvolvimento → CTA",
-    "viralFactor": "Por que isso pode viralizar"
-  }
-]`;
-
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      if (!apiKey) throw new Error("VITE_GEMINI_API_KEY não configurada no .env");
-
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.9, maxOutputTokens: 2048 },
-          }),
-        }
-      );
-
-      const data = await res.json();
-      const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
-      const jsonMatch = raw.match(/\[[\s\S]*\]/);
-      if (jsonMatch) setIdeas(JSON.parse(jsonMatch[0]));
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div>
-      <div style={{ display: "grid", gap: 12, marginBottom: 20 }}>
-        <div>
-          <label style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", fontFamily: "'Space Mono', monospace", letterSpacing: 1, display: "block", marginBottom: 6 }}>SEU NICHO</label>
-          <input
-            value={niche}
-            onChange={(e) => setNiche(e.target.value)}
-            placeholder="Ex: finanças pessoais para millennials"
-            style={{ width: "100%", padding: "12px 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, color: "#fff", fontSize: 14, fontFamily: "'Sora', sans-serif", outline: "none", boxSizing: "border-box" }}
-          />
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <div>
-            <label style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", fontFamily: "'Space Mono', monospace", letterSpacing: 1, display: "block", marginBottom: 6 }}>PLATAFORMA</label>
-            <select value={platform} onChange={(e) => setPlatform(e.target.value)}
-              style={{ width: "100%", padding: "11px 14px", background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, color: "#fff", fontSize: 13, fontFamily: "'Sora', sans-serif", outline: "none" }}>
-              {PLATFORMS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
-            </select>
-          </div>
-          <div>
-            <label style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", fontFamily: "'Space Mono', monospace", letterSpacing: 1, display: "block", marginBottom: 6 }}>FORMATO</label>
-            <select value={format} onChange={(e) => setFormat(e.target.value)}
-              style={{ width: "100%", padding: "11px 14px", background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, color: "#fff", fontSize: 13, fontFamily: "'Sora', sans-serif", outline: "none" }}>
-              {formats.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
-            </select>
-          </div>
-        </div>
-        <button
-          onClick={generateIdeas}
-          disabled={!niche.trim() || loading}
-          style={{ padding: "13px", borderRadius: 12, border: "none", background: niche.trim() && !loading ? "linear-gradient(135deg, #fe2c55, #ff7b00)" : "rgba(255,255,255,0.06)", color: niche.trim() && !loading ? "#fff" : "rgba(255,255,255,0.2)", fontSize: 14, fontWeight: 700, cursor: niche.trim() && !loading ? "pointer" : "not-allowed", fontFamily: "'Sora', sans-serif", transition: "all 0.2s" }}>
-          {loading ? "⟳ Gerando..." : "✨ Gerar 5 Ideias Virais"}
-        </button>
-      </div>
-
-      {ideas.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {ideas.map((idea, i) => (
-            <div key={i} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "14px 16px" }}>
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 10 }}>
-                <span style={{ width: 24, height: 24, borderRadius: 6, background: "rgba(254,44,85,0.2)", color: "#fe2c55", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontFamily: "'Space Mono', monospace" }}>{i + 1}</span>
-                <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#fff", lineHeight: 1.3 }}>{idea.title}</p>
-              </div>
-              <div style={{ display: "grid", gap: 8 }}>
-                <div style={{ background: "rgba(255,180,0,0.06)", border: "1px solid rgba(255,180,0,0.15)", borderRadius: 8, padding: "8px 10px" }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: "#ff7b00", letterSpacing: "0.08em" }}>🪝 HOOK</span>
-                  <p style={{ margin: "4px 0 0", fontSize: 13, color: "rgba(255,255,255,0.75)", lineHeight: 1.4 }}>{idea.hook}</p>
-                </div>
-                <div style={{ background: "rgba(78,205,196,0.06)", border: "1px solid rgba(78,205,196,0.15)", borderRadius: 8, padding: "8px 10px" }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: "#4ecdc4", letterSpacing: "0.08em" }}>📋 ESTRUTURA</span>
-                  <p style={{ margin: "4px 0 0", fontSize: 13, color: "rgba(255,255,255,0.75)", lineHeight: 1.4 }}>{idea.structure}</p>
-                </div>
-                <div style={{ background: "rgba(254,44,85,0.06)", border: "1px solid rgba(254,44,85,0.15)", borderRadius: 8, padding: "8px 10px" }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: "#fe2c55", letterSpacing: "0.08em" }}>🔥 FATOR VIRAL</span>
-                  <p style={{ margin: "4px 0 0", fontSize: 13, color: "rgba(255,255,255,0.75)", lineHeight: 1.4 }}>{idea.viralFactor}</p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ─── Caption Generator ─── */
-
-function CaptionGenerator() {
-  const [topic, setTopic] = useState("");
-  const [tone, setTone] = useState("engajamento");
-  const [captions, setCaptions] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [copied, setCopied] = useState(null);
-
-  const tones = [
-    { id: "engajamento", label: "Engajamento" },
-    { id: "informativo", label: "Informativo" },
-    { id: "storytelling", label: "Storytelling" },
-    { id: "provocativo", label: "Provocativo" },
-    { id: "inspiracional", label: "Inspiracional" },
-  ];
-
-  const generateCaptions = async () => {
-    if (!topic.trim()) return;
-    setLoading(true);
-    setCaptions([]);
-    try {
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      if (!apiKey) throw new Error("VITE_GEMINI_API_KEY não configurada");
-
-      const prompt = `Crie 3 legendas para Instagram/TikTok sobre "${topic}" no tom: ${tone}.
-Cada legenda deve ter: gancho forte, desenvolvimento, CTA e hashtags relevantes.
-Responda SOMENTE com JSON array:
-[{ "caption": "texto completo com emojis e hashtags", "cta": "chamada para ação destacada", "hooks": "primeiro linha isolada" }]`;
-
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.85, maxOutputTokens: 2048 } }),
-        }
-      );
-      const data = await res.json();
-      const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
-      const match = raw.match(/\[[\s\S]*\]/);
-      if (match) setCaptions(JSON.parse(match[0]));
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const copy = (text, i) => {
-    navigator.clipboard.writeText(text);
-    setCopied(i);
-    setTimeout(() => setCopied(null), 2000);
-  };
-
-  return (
-    <div>
-      <div style={{ display: "grid", gap: 12, marginBottom: 20 }}>
-        <div>
-          <label style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", fontFamily: "'Space Mono', monospace", letterSpacing: 1, display: "block", marginBottom: 6 }}>ASSUNTO DO POST</label>
-          <input
-            value={topic}
-            onChange={(e) => setTopic(e.target.value)}
-            placeholder="Ex: 3 erros que estão te impedindo de crescer no Instagram"
-            style={{ width: "100%", padding: "12px 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, color: "#fff", fontSize: 14, fontFamily: "'Sora', sans-serif", outline: "none", boxSizing: "border-box" }}
-          />
-        </div>
-        <div>
-          <label style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", fontFamily: "'Space Mono', monospace", letterSpacing: 1, display: "block", marginBottom: 6 }}>TOM DA LEGENDA</label>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {tones.map((t) => (
-              <button key={t.id} onClick={() => setTone(t.id)}
-                style={{ padding: "7px 14px", borderRadius: 99, border: `1.5px solid ${tone === t.id ? "#fe2c55" : "rgba(255,255,255,0.12)"}`, background: tone === t.id ? "rgba(254,44,85,0.12)" : "transparent", color: tone === t.id ? "#fe2c55" : "rgba(255,255,255,0.45)", fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.15s" }}>
-                {t.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <button onClick={generateCaptions} disabled={!topic.trim() || loading}
-          style={{ padding: "13px", borderRadius: 12, border: "none", background: topic.trim() && !loading ? "linear-gradient(135deg, #fe2c55, #ff7b00)" : "rgba(255,255,255,0.06)", color: topic.trim() && !loading ? "#fff" : "rgba(255,255,255,0.2)", fontSize: 14, fontWeight: 700, cursor: topic.trim() && !loading ? "pointer" : "not-allowed", fontFamily: "'Sora', sans-serif", transition: "all 0.2s" }}>
-          {loading ? "⟳ Criando legendas..." : "✨ Gerar Legendas"}
-        </button>
-      </div>
-
-      {captions.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {captions.map((cap, i) => (
-            <div key={i} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "14px 16px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.3)", fontFamily: "'Space Mono', monospace", letterSpacing: 1 }}>LEGENDA {i + 1}</span>
-                <button onClick={() => copy(cap.caption, i)}
-                  style={{ fontSize: 11, fontWeight: 600, color: copied === i ? "#4ecdc4" : "#fe2c55", background: copied === i ? "rgba(78,205,196,0.15)" : "rgba(254,44,85,0.1)", border: "none", borderRadius: 6, padding: "5px 10px", cursor: "pointer" }}>
-                  {copied === i ? "✓ Copiado!" : "📋 Copiar tudo"}
-                </button>
-              </div>
-              {cap.hooks && (
-                <p style={{ margin: "0 0 8px", fontSize: 14, fontWeight: 700, color: "#fe2c55", lineHeight: 1.3 }}>{cap.hooks}</p>
-              )}
-              <p style={{ margin: 0, fontSize: 13, color: "rgba(255,255,255,0.7)", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{cap.caption}</p>
-              {cap.cta && (
-                <p style={{ margin: "10px 0 0", fontSize: 12, color: "#4ecdc4", fontWeight: 600 }}>→ {cap.cta}</p>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ─── Thumbnail Analyzer ─── */
-
-function ThumbnailAnalyzer() {
-  const [url, setUrl] = useState("");
-  const [analysis, setAnalysis] = useState(null);
-  const [loading, setLoading] = useState(false);
-
-  const analyze = async () => {
-    if (!url.trim()) return;
-    setLoading(true);
-    setAnalysis(null);
-    try {
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      if (!apiKey) throw new Error("VITE_GEMINI_API_KEY não configurada");
-
-      const imageRes = await fetch(url);
-      const blob = await imageRes.blob();
-      const base64 = await new Promise((res) => {
-        const r = new FileReader();
-        r.onloadend = () => res(r.result.split(",")[1]);
-        r.readAsDataURL(blob);
-      });
-
-      const prompt = `Analise esta thumbnail para YouTube/redes sociais. Avalie de 0-10:
-- Clareza visual (contraste, legibilidade)
-- Gatilho emocional (desperta curiosidade?)
-- Texto (impactante, tamanho ideal?)
-- Cores (chamativas, harmônicas?)
-- CTR estimado (potencial de cliques)
-
-Responda SOMENTE com JSON:
-{
-  "overallScore": <0-100>,
-  "scores": { "clarity": <0-10>, "emotion": <0-10>, "text": <0-10>, "colors": <0-10>, "ctr": <0-10> },
-  "strengths": ["ponto forte 1", "ponto forte 2"],
-  "improvements": ["melhoria 1", "melhoria 2"],
-  "verdict": "frase de 1 linha sobre a thumbnail"
-}`;
-
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{
-              parts: [
-                { inlineData: { mimeType: blob.type || "image/jpeg", data: base64 } },
-                { text: prompt },
-              ],
-            }],
-            generationConfig: { temperature: 0.3, maxOutputTokens: 1024 },
-          }),
-        }
-      );
-      const data = await res.json();
-      const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-      const match = raw.match(/\{[\s\S]*\}/);
-      if (match) setAnalysis(JSON.parse(match[0]));
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const scoreLabels = { clarity: "Clareza", emotion: "Emoção", text: "Texto", colors: "Cores", ctr: "CTR" };
-
-  return (
-    <div>
-      <div style={{ display: "grid", gap: 12, marginBottom: 20 }}>
-        <div>
-          <label style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", fontFamily: "'Space Mono', monospace", letterSpacing: 1, display: "block", marginBottom: 6 }}>URL DA IMAGEM</label>
-          <input
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://i.ytimg.com/vi/..."
-            style={{ width: "100%", padding: "12px 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, color: "#fff", fontSize: 13, fontFamily: "'Space Mono', monospace", outline: "none", boxSizing: "border-box" }}
-          />
-        </div>
-        {url && (
-          <img src={url} alt="preview" onError={(e) => e.target.style.display = "none"} style={{ width: "100%", maxHeight: 200, objectFit: "cover", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)" }} />
-        )}
-        <button onClick={analyze} disabled={!url.trim() || loading}
-          style={{ padding: "13px", borderRadius: 12, border: "none", background: url.trim() && !loading ? "linear-gradient(135deg, #fe2c55, #ff7b00)" : "rgba(255,255,255,0.06)", color: url.trim() && !loading ? "#fff" : "rgba(255,255,255,0.2)", fontSize: 14, fontWeight: 700, cursor: url.trim() && !loading ? "pointer" : "not-allowed", fontFamily: "'Sora', sans-serif", transition: "all 0.2s" }}>
-          {loading ? "⟳ Analisando..." : "🔍 Analisar Thumbnail"}
-        </button>
-      </div>
-
-      {analysis && (
-        <div style={{ display: "grid", gap: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "14px 16px" }}>
+      {Object.keys(scores).length>=4&&(
+        <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:16}}>
+          <Card style={{width:"100%",display:"flex",alignItems:"center",gap:16}}>
+            <ScoreRing score={total} size={90}/>
             <div>
-              <p style={{ margin: "0 0 4px", fontSize: 12, color: "rgba(255,255,255,0.35)", fontFamily: "'Space Mono', monospace", letterSpacing: 1 }}>SCORE GERAL</p>
-              <p style={{ margin: 0, fontSize: 13, color: "rgba(255,255,255,0.6)" }}>{analysis.verdict}</p>
+              <Label>Score viral</Label>
+              <p style={{margin:"5px 0 4px",fontSize:22,fontWeight:700,color:C.text,fontFamily:"'JetBrains Mono',monospace"}}>{total}<span style={{fontSize:11,color:C.textDim}}>/100</span></p>
+              <p style={{margin:0,fontSize:12,color:total>=80?C.blue:total>=60?C.success:C.textDim}}>
+                {total>=80?"Alto potencial":total>=60?"Bom potencial":total>=40?"Potencial médio":"Baixo potencial"}
+              </p>
             </div>
-            <CircularScore score={analysis.overallScore} size={100} />
-          </div>
-
-          {analysis.scores && (
-            <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "14px 16px" }}>
-              {Object.entries(analysis.scores).map(([key, val]) => (
-                <div key={key} style={{ marginBottom: 10 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                    <span style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>{scoreLabels[key] || key}</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "#fe2c55", fontFamily: "'Space Mono', monospace" }}>{val}/10</span>
-                  </div>
-                  <HeatBar value={val * 10} size="sm" />
-                </div>
-              ))}
-            </div>
-          )}
-
-          {analysis.strengths?.length > 0 && (
-            <div style={{ background: "rgba(78,205,196,0.06)", border: "1px solid rgba(78,205,196,0.15)", borderRadius: 10, padding: "12px 14px" }}>
-              <p style={{ margin: "0 0 8px", fontSize: 11, fontWeight: 700, color: "#4ecdc4", letterSpacing: "0.08em" }}>✅ PONTOS FORTES</p>
-              {analysis.strengths.map((s, i) => <p key={i} style={{ margin: "0 0 4px", fontSize: 13, color: "rgba(255,255,255,0.7)" }}>• {s}</p>)}
-            </div>
-          )}
-
-          {analysis.improvements?.length > 0 && (
-            <div style={{ background: "rgba(254,44,85,0.06)", border: "1px solid rgba(254,44,85,0.15)", borderRadius: 10, padding: "12px 14px" }}>
-              <p style={{ margin: "0 0 8px", fontSize: 11, fontWeight: 700, color: "#fe2c55", letterSpacing: "0.08em" }}>⚡ MELHORIAS</p>
-              {analysis.improvements.map((s, i) => <p key={i} style={{ margin: "0 0 4px", fontSize: 13, color: "rgba(255,255,255,0.7)" }}>• {s}</p>)}
-            </div>
-          )}
+          </Card>
+          <RadarChart scores={scores}/>
+          <GhostBtn onClick={()=>setScores({})}>Resetar avaliação</GhostBtn>
         </div>
       )}
     </div>
   );
 }
 
-/* ─── Video Analyzer ─── */
+/* ════════════════════════════════════════════
+   TOOL 4 — CONTENT IDEAS
+════════════════════════════════════════════ */
 
-function VideoAnalyzer() {
-  const [mode, setMode] = useState("upload"); // "upload" | "url"
-  const [file, setFile] = useState(null);
-  const [videoUrl, setVideoUrl] = useState("");
-  const [preview, setPreview] = useState(null);
-  const [analysis, setAnalysis] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [progress, setProgress] = useState("");
-  const [dragOver, setDragOver] = useState(false);
-  const inputRef = useRef(null);
+function ContentIdeasGenerator(){
+  const[niche,setNiche]=useState("");
+  const[platform,setPlatform]=useState("tiktok");
+  const[format,setFormat]=useState("short");
+  const[ideas,setIdeas]=useState([]);
+  const[loading,setLoading]=useState(false);
+  const formats=[{id:"short",label:"Short/Reels (<60s)"},{id:"long",label:"Vídeo longo (>5min)"},{id:"carousel",label:"Carrossel"},{id:"story",label:"Story/Flick"}];
 
-  const handleFile = (f) => {
-    if (!f || !f.type.startsWith("video/")) return;
-    setFile(f);
-    setAnalysis(null);
-    const url = URL.createObjectURL(f);
-    setPreview(url);
+  const generate=async()=>{
+    if(!niche.trim())return;
+    setLoading(true);setIdeas([]);
+    try{
+      const apiKey=import.meta.env.VITE_GEMINI_API_KEY;
+      const prompt=`Gere 5 ideias virais. Nicho: ${niche}. Plataforma: ${PLATFORMS.find(p=>p.id===platform)?.label}. Formato: ${formats.find(f=>f.id===format)?.label}.
+JSON array: [{"title":"título","hook":"gancho 3s","structure":"intro→dev→CTA","viralFactor":"por que viraliza"}]`;
+      const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.9,maxOutputTokens:2048}}),
+      });
+      const d=await r.json();
+      const raw=d?.candidates?.[0]?.content?.parts?.[0]?.text||"[]";
+      const m=raw.match(/\[[\s\S]*\]/);
+      if(m)setIdeas(JSON.parse(m[0]));
+    }catch(e){console.error(e);}finally{setLoading(false);}
   };
 
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setDragOver(false);
-    handleFile(e.dataTransfer.files[0]);
-  };
-
-  const analyze = async () => {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    if (!apiKey) { alert("VITE_GEMINI_API_KEY não configurada no .env"); return; }
-
-    setLoading(true);
-    setAnalysis(null);
-
-    try {
-      let base64 = null;
-      let mimeType = "video/mp4";
-
-      if (mode === "upload" && file) {
-        setProgress("Carregando vídeo...");
-        mimeType = file.type || "video/mp4";
-        base64 = await new Promise((res, rej) => {
-          const r = new FileReader();
-          r.onload = () => res(r.result.split(",")[1]);
-          r.onerror = rej;
-          r.readAsDataURL(file);
-        });
-      }
-
-      setProgress("Analisando com Gemini...");
-
-      const prompt = `Você é um especialista em conteúdo viral para redes sociais brasileiras.
-
-Analise este vídeo e avalie seu potencial viral com base nos seguintes critérios:
-
-1. GANCHO (primeiros 3 segundos): o início prende atenção?
-2. EMOÇÃO: gera riso, surpresa, curiosidade, inspiração ou choque?
-3. RETENÇÃO: há motivo para assistir até o fim?
-4. COMPARTILHAMENTO: dá vontade de mandar para alguém?
-5. TENDÊNCIA: o tema está em alta nas redes agora?
-6. ÁUDIO: o áudio/trilha ajuda no engajamento?
-7. EDIÇÃO: ritmo, cortes e qualidade visual estão bons?
-
-Responda SOMENTE com JSON válido, sem markdown:
-{
-  "viralScore": <0-100>,
-  "verdict": "frase de 1 linha resumindo o potencial viral",
-  "scores": {
-    "hook": <0-10>,
-    "emotion": <0-10>,
-    "retention": <0-10>,
-    "shareable": <0-10>,
-    "trend": <0-10>,
-    "audio": <0-10>,
-    "editing": <0-10>
-  },
-  "strengths": ["ponto forte 1", "ponto forte 2", "ponto forte 3"],
-  "improvements": ["melhoria 1", "melhoria 2", "melhoria 3"],
-  "bestPlatform": "plataforma ideal para este vídeo",
-  "estimatedReach": "estimativa de alcance: ex: Potencial de 10k-50k views",
-  "hookSuggestion": "sugestão de gancho melhorado para os primeiros 3 segundos",
-  "bestPostTime": "melhor horário para postar este tipo de conteúdo"
-}`;
-
-      const parts = base64
-        ? [{ inlineData: { mimeType, data: base64 } }, { text: prompt }]
-        : [{ text: `URL do vídeo: ${videoUrl}\n\n${prompt}` }];
-
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts }],
-            generationConfig: { temperature: 0.4, maxOutputTokens: 2048 },
-          }),
-        }
-      );
-
-      const data = await res.json();
-      const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-      const match = raw.match(/\{[\s\S]*\}/);
-      if (match) setAnalysis(JSON.parse(match[0]));
-      else throw new Error("Resposta inválida do Gemini");
-    } catch (e) {
-      console.error(e);
-      alert("Erro ao analisar: " + e.message);
-    } finally {
-      setLoading(false);
-      setProgress("");
-    }
-  };
-
-  const scoreLabels = {
-    hook: "Gancho (3s)", emotion: "Emoção", retention: "Retenção",
-    shareable: "Compartilhável", trend: "Tendência", audio: "Áudio", editing: "Edição",
-  };
-
-  const canAnalyze = mode === "upload" ? !!file : !!videoUrl.trim();
-
-  return (
+  return(
     <div>
-      {/* Mode toggle */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
-        {[{ id: "upload", label: "📁 Enviar Vídeo" }, { id: "url", label: "🔗 URL do Vídeo" }].map((m) => (
-          <button key={m.id} onClick={() => { setMode(m.id); setAnalysis(null); setFile(null); setPreview(null); setVideoUrl(""); }}
-            style={{ flex: 1, padding: "9px 14px", borderRadius: 10, border: `1.5px solid ${mode === m.id ? "#fe2c55" : "rgba(255,255,255,0.1)"}`, background: mode === m.id ? "rgba(254,44,85,0.12)" : "transparent", color: mode === m.id ? "#fe2c55" : "rgba(255,255,255,0.4)", fontWeight: mode === m.id ? 700 : 500, fontSize: 13, cursor: "pointer", transition: "all 0.2s", fontFamily: "'Sora', sans-serif" }}>
-            {m.label}
-          </button>
-        ))}
+      <div style={{marginBottom:14}}>
+        <div style={{marginBottom:6}}><Label>Seu nicho</Label></div>
+        <FieldInput value={niche} onChange={e=>setNiche(e.target.value)} placeholder="Ex: finanças pessoais para millennials"/>
       </div>
-
-      {/* Upload area */}
-      {mode === "upload" && (
-        <div
-          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={handleDrop}
-          onClick={() => !file && inputRef.current?.click()}
-          style={{ border: `2px dashed ${dragOver ? "#fe2c55" : file ? "rgba(78,205,196,0.4)" : "rgba(255,255,255,0.12)"}`, borderRadius: 14, padding: file ? "14px" : "40px 20px", textAlign: "center", cursor: file ? "default" : "pointer", transition: "all 0.2s", background: dragOver ? "rgba(254,44,85,0.05)" : "rgba(255,255,255,0.02)", marginBottom: 14 }}>
-          <input ref={inputRef} type="file" accept="video/*" style={{ display: "none" }} onChange={(e) => handleFile(e.target.files[0])} />
-
-          {!file ? (
-            <>
-              <div style={{ fontSize: 36, marginBottom: 10 }}>🎬</div>
-              <p style={{ margin: "0 0 6px", fontSize: 14, fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>
-                Arraste o vídeo aqui ou clique para selecionar
-              </p>
-              <p style={{ margin: 0, fontSize: 12, color: "rgba(255,255,255,0.3)" }}>
-                MP4, MOV, AVI · Reels, TikToks, Shorts
-              </p>
-            </>
-          ) : (
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              {preview && (
-                <video src={preview} style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 8, flexShrink: 0 }} muted />
-              )}
-              <div style={{ flex: 1, textAlign: "left" }}>
-                <p style={{ margin: "0 0 3px", fontSize: 13, fontWeight: 600, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file.name}</p>
-                <p style={{ margin: 0, fontSize: 12, color: "rgba(255,255,255,0.35)" }}>{(file.size / 1024 / 1024).toFixed(1)} MB</p>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+        <div><div style={{marginBottom:5}}><Label>Plataforma</Label></div><FieldSelect value={platform} onChange={e=>setPlatform(e.target.value)}>{PLATFORMS.map(p=><option key={p.id} value={p.id}>{p.label}</option>)}</FieldSelect></div>
+        <div><div style={{marginBottom:5}}><Label>Formato</Label></div><FieldSelect value={format} onChange={e=>setFormat(e.target.value)}>{formats.map(f=><option key={f.id} value={f.id}>{f.label}</option>)}</FieldSelect></div>
+      </div>
+      <PrimaryBtn onClick={generate} disabled={!niche.trim()||loading} fullWidth>
+        {loading?<><Spin/> gerando...</>:"Gerar 5 ideias virais"}
+      </PrimaryBtn>
+      {ideas.length>0&&(
+        <div style={{marginTop:14,display:"flex",flexDirection:"column",gap:7}}>
+          {ideas.map((idea,i)=>(
+            <Card key={i}>
+              <div style={{display:"flex",gap:8,marginBottom:8}}>
+                <span style={{fontSize:10,color:C.textDim,fontFamily:"'JetBrains Mono',monospace",flexShrink:0,paddingTop:1}}>{String(i+1).padStart(2,"0")}</span>
+                <p style={{margin:0,fontSize:13,fontWeight:500,color:C.text,lineHeight:1.3}}>{idea.title}</p>
               </div>
-              <button onClick={(e) => { e.stopPropagation(); setFile(null); setPreview(null); setAnalysis(null); }}
-                style={{ background: "rgba(254,44,85,0.15)", border: "none", color: "#fe2c55", borderRadius: 8, padding: "5px 10px", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
-                ✕ Trocar
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* URL input */}
-      {mode === "url" && (
-        <div style={{ marginBottom: 14 }}>
-          <input
-            value={videoUrl}
-            onChange={(e) => setVideoUrl(e.target.value)}
-            placeholder="https://www.tiktok.com/@... ou https://youtube.com/shorts/..."
-            style={{ width: "100%", padding: "12px 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, color: "#fff", fontSize: 13, fontFamily: "'Space Mono', monospace", outline: "none", boxSizing: "border-box" }}
-          />
-          <p style={{ margin: "6px 0 0", fontSize: 11, color: "rgba(255,255,255,0.25)" }}>
-            * Para URLs, o Gemini analisa com base no contexto disponível
-          </p>
-        </div>
-      )}
-
-      {/* Analyze button */}
-      <button
-        onClick={analyze}
-        disabled={!canAnalyze || loading}
-        style={{ width: "100%", padding: "14px", borderRadius: 12, border: "none", background: canAnalyze && !loading ? "linear-gradient(135deg, #fe2c55, #ff7b00)" : "rgba(255,255,255,0.06)", color: canAnalyze && !loading ? "#fff" : "rgba(255,255,255,0.2)", fontSize: 15, fontWeight: 700, cursor: canAnalyze && !loading ? "pointer" : "not-allowed", fontFamily: "'Sora', sans-serif", transition: "all 0.2s", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 20 }}>
-        {loading ? (
-          <>
-            <span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>⟳</span>
-            {progress || "Analisando vídeo..."}
-          </>
-        ) : "🔥 Analisar Potencial Viral"}
-      </button>
-
-      {/* Results */}
-      {analysis && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-
-          {/* Score principal */}
-          <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: "20px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
-            <div style={{ flex: 1 }}>
-              <p style={{ margin: "0 0 4px", fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "'Space Mono', monospace", letterSpacing: 1 }}>POTENCIAL VIRAL</p>
-              <p style={{ margin: "0 0 10px", fontSize: 15, fontWeight: 600, color: "#fff", lineHeight: 1.4 }}>{analysis.verdict}</p>
-              {analysis.bestPlatform && (
-                <span style={{ fontSize: 12, color: "#fe2c55", background: "rgba(254,44,85,0.12)", border: "1px solid rgba(254,44,85,0.25)", borderRadius: 20, padding: "3px 10px", fontWeight: 600 }}>
-                  🎯 {analysis.bestPlatform}
-                </span>
-              )}
-            </div>
-            <CircularScore score={analysis.viralScore} size={110} />
-          </div>
-
-          {/* Alcance estimado + horário */}
-          {(analysis.estimatedReach || analysis.bestPostTime) && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              {analysis.estimatedReach && (
-                <div style={{ background: "rgba(78,205,196,0.07)", border: "1px solid rgba(78,205,196,0.2)", borderRadius: 10, padding: "10px 12px" }}>
-                  <p style={{ margin: "0 0 4px", fontSize: 10, fontWeight: 700, color: "#4ecdc4", letterSpacing: "0.08em" }}>📊 ALCANCE EST.</p>
-                  <p style={{ margin: 0, fontSize: 12, color: "rgba(255,255,255,0.7)", lineHeight: 1.4 }}>{analysis.estimatedReach}</p>
-                </div>
-              )}
-              {analysis.bestPostTime && (
-                <div style={{ background: "rgba(255,180,0,0.07)", border: "1px solid rgba(255,180,0,0.2)", borderRadius: 10, padding: "10px 12px" }}>
-                  <p style={{ margin: "0 0 4px", fontSize: 10, fontWeight: 700, color: "#ff7b00", letterSpacing: "0.08em" }}>🕐 MELHOR HORÁRIO</p>
-                  <p style={{ margin: 0, fontSize: 12, color: "rgba(255,255,255,0.7)", lineHeight: 1.4 }}>{analysis.bestPostTime}</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Scores por critério */}
-          {analysis.scores && (
-            <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "14px 16px" }}>
-              <p style={{ margin: "0 0 12px", fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.35)", fontFamily: "'Space Mono', monospace", letterSpacing: 1 }}>BREAKDOWN</p>
-              {Object.entries(analysis.scores).map(([key, val]) => (
-                <div key={key} style={{ marginBottom: 10 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                    <span style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>{scoreLabels[key] || key}</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: val >= 8 ? "#4ecdc4" : val >= 6 ? "#ffc107" : "#fe2c55", fontFamily: "'Space Mono', monospace" }}>{val}/10</span>
-                  </div>
-                  <HeatBar value={val * 10} size="sm" />
+              {[["Hook",idea.hook],["Estrutura",idea.structure],["Fator viral",idea.viralFactor]].map(([lbl,val])=>(
+                <div key={lbl} style={{marginBottom:8}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}><Label>{lbl}</Label><CopyBtn text={val}/></div>
+                  <p style={{margin:0,fontSize:12,color:C.textMid,lineHeight:1.4}}>{val}</p>
                 </div>
               ))}
-            </div>
-          )}
-
-          {/* Hook suggestion */}
-          {analysis.hookSuggestion && (
-            <div style={{ background: "rgba(254,44,85,0.07)", border: "1px solid rgba(254,44,85,0.2)", borderRadius: 10, padding: "12px 14px" }}>
-              <p style={{ margin: "0 0 6px", fontSize: 10, fontWeight: 700, color: "#fe2c55", letterSpacing: "0.08em" }}>🪝 GANCHO SUGERIDO</p>
-              <p style={{ margin: 0, fontSize: 13, color: "rgba(255,255,255,0.8)", lineHeight: 1.5, fontStyle: "italic" }}>"{analysis.hookSuggestion}"</p>
-            </div>
-          )}
-
-          {/* Pontos fortes */}
-          {analysis.strengths?.length > 0 && (
-            <div style={{ background: "rgba(78,205,196,0.06)", border: "1px solid rgba(78,205,196,0.15)", borderRadius: 10, padding: "12px 14px" }}>
-              <p style={{ margin: "0 0 8px", fontSize: 11, fontWeight: 700, color: "#4ecdc4", letterSpacing: "0.08em" }}>✅ PONTOS FORTES</p>
-              {analysis.strengths.map((s, i) => <p key={i} style={{ margin: "0 0 4px", fontSize: 13, color: "rgba(255,255,255,0.7)", lineHeight: 1.4 }}>• {s}</p>)}
-            </div>
-          )}
-
-          {/* Melhorias */}
-          {analysis.improvements?.length > 0 && (
-            <div style={{ background: "rgba(255,123,0,0.06)", border: "1px solid rgba(255,123,0,0.15)", borderRadius: 10, padding: "12px 14px" }}>
-              <p style={{ margin: "0 0 8px", fontSize: 11, fontWeight: 700, color: "#ff7b00", letterSpacing: "0.08em" }}>⚡ O QUE MELHORAR</p>
-              {analysis.improvements.map((s, i) => <p key={i} style={{ margin: "0 0 4px", fontSize: 13, color: "rgba(255,255,255,0.7)", lineHeight: 1.4 }}>• {s}</p>)}
-            </div>
-          )}
-
-          {/* Analisar outro */}
-          <button onClick={() => { setFile(null); setPreview(null); setVideoUrl(""); setAnalysis(null); }}
-            style={{ padding: "10px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "rgba(255,255,255,0.4)", fontSize: 13, cursor: "pointer", fontFamily: "'Sora', sans-serif" }}>
-            ↩ Analisar outro vídeo
-          </button>
+            </Card>
+          ))}
         </div>
       )}
     </div>
   );
 }
 
-/* ─── Main App ─── */
+/* ════════════════════════════════════════════
+   TOOL 5 — CAPTIONS
+════════════════════════════════════════════ */
 
-const TOOLS = [
-  { id: "radar", label: "Radar de Tendências", icon: "📡", description: "Trends reais por nicho e plataforma" },
-  { id: "viral", label: "Score Viral", icon: "🔥", description: "Avalie o potencial viral do seu conteúdo" },
-  { id: "ideas", label: "Gerador de Ideias", icon: "💡", description: "5 ideias virais para qualquer nicho" },
-  { id: "captions", label: "Legendas IA", icon: "✍️", description: "Legendas que geram engajamento" },
-  { id: "thumbnail", label: "Análise Thumbnail", icon: "🖼️", description: "Score e feedback da sua thumbnail" },
-  { id: "video", label: "Analisar Vídeo", icon: "🎬", description: "Envie um vídeo e veja seu potencial viral" },
-];
+function CaptionGenerator(){
+  const[topic,setTopic]=useState("");
+  const[tone,setTone]=useState("engajamento");
+  const[captions,setCaptions]=useState([]);
+  const[loading,setLoading]=useState(false);
+  const tones=["engajamento","informativo","storytelling","provocativo","inspiracional"];
 
-export default function ViralToolkit() {
-  const [activeTool, setActiveTool] = useState("radar");
+  const generate=async()=>{
+    if(!topic.trim())return;
+    setLoading(true);setCaptions([]);
+    try{
+      const apiKey=import.meta.env.VITE_GEMINI_API_KEY;
+      const prompt=`Crie 3 legendas para Instagram/TikTok sobre "${topic}" no tom: ${tone}. Com gancho, desenvolvimento, CTA e hashtags.
+JSON: [{"caption":"texto","cta":"chamada","hooks":"primeira linha"}]`;
+      const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.85,maxOutputTokens:2048}}),
+      });
+      const d=await r.json();
+      const raw=d?.candidates?.[0]?.content?.parts?.[0]?.text||"[]";
+      const m=raw.match(/\[[\s\S]*\]/);
+      if(m)setCaptions(JSON.parse(m[0]));
+    }catch(e){console.error(e);}finally{setLoading(false);}
+  };
 
-  useEffect(() => {
-    const link = document.createElement("link");
-    link.rel = "stylesheet";
-    link.href = FONTS_URL;
+  return(
+    <div>
+      <div style={{marginBottom:14}}>
+        <div style={{marginBottom:6}}><Label>Assunto do post</Label></div>
+        <FieldInput value={topic} onChange={e=>setTopic(e.target.value)} placeholder="Ex: 3 erros que estão te impedindo de crescer"/>
+      </div>
+      <div style={{marginBottom:14}}>
+        <div style={{marginBottom:8}}><Label>Tom</Label></div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+          {tones.map(t=><Chip key={t} active={tone===t} onClick={()=>setTone(t)}>{t}</Chip>)}
+        </div>
+      </div>
+      <PrimaryBtn onClick={generate} disabled={!topic.trim()||loading} fullWidth>
+        {loading?<><Spin/> criando...</>:"Gerar legendas"}
+      </PrimaryBtn>
+      {captions.length>0&&(
+        <div style={{marginTop:14,display:"flex",flexDirection:"column",gap:7}}>
+          {captions.map((cap,i)=>(
+            <Card key={i}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:7}}><Label>Legenda {i+1}</Label><CopyBtn text={cap.caption}/></div>
+              {cap.hooks&&<p style={{margin:"0 0 6px",fontSize:13,fontWeight:500,color:C.blue}}>{cap.hooks}</p>}
+              <p style={{margin:0,fontSize:12,color:C.textMid,lineHeight:1.6,whiteSpace:"pre-wrap"}}>{cap.caption}</p>
+              {cap.cta&&<p style={{margin:"7px 0 0",fontSize:11,color:C.textDim}}>→ {cap.cta}</p>}
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════
+   TOOL 6 — THUMBNAIL
+════════════════════════════════════════════ */
+
+function ThumbnailAnalyzer(){
+  const[url,setUrl]=useState("");
+  const[analysis,setAnalysis]=useState(null);
+  const[loading,setLoading]=useState(false);
+
+  const analyze=async()=>{
+    if(!url.trim())return;
+    setLoading(true);setAnalysis(null);
+    try{
+      const apiKey=import.meta.env.VITE_GEMINI_API_KEY;
+      const imgRes=await fetch(url);
+      const blob=await imgRes.blob();
+      const base64=await new Promise(res=>{const r=new FileReader();r.onloadend=()=>res(r.result.split(",")[1]);r.readAsDataURL(blob);});
+      const prompt=`Analise esta thumbnail. Avalie 0-10: clareza, emoção, texto, cores, CTR.
+JSON: {"overallScore":<0-100>,"scores":{"clarity":<0-10>,"emotion":<0-10>,"text":<0-10>,"colors":<0-10>,"ctr":<0-10>},"strengths":["s1","s2"],"improvements":["m1","m2"],"verdict":"frase"}`;
+      const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({contents:[{parts:[{inlineData:{mimeType:blob.type||"image/jpeg",data:base64}},{text:prompt}]}],generationConfig:{temperature:0.3,maxOutputTokens:1024}}),
+      });
+      const d=await r.json();
+      const raw=d?.candidates?.[0]?.content?.parts?.[0]?.text||"{}";
+      const m=raw.match(/\{[\s\S]*\}/);
+      if(m)setAnalysis(JSON.parse(m[0]));
+    }catch(e){console.error(e);}finally{setLoading(false);}
+  };
+
+  const sLabels={clarity:"Clareza",emotion:"Emoção",text:"Texto",colors:"Cores",ctr:"CTR"};
+
+  return(
+    <div>
+      <div style={{marginBottom:14}}>
+        <div style={{marginBottom:6}}><Label>URL da imagem</Label></div>
+        <FieldInput value={url} onChange={e=>setUrl(e.target.value)} placeholder="https://i.ytimg.com/vi/..." mono/>
+      </div>
+      {url&&<div style={{marginBottom:14}}><img src={url} alt="preview" onError={e=>e.target.style.display="none"} style={{width:"100%",maxHeight:160,objectFit:"cover",borderRadius:7,border:`1px solid ${C.border}`}}/></div>}
+      <PrimaryBtn onClick={analyze} disabled={!url.trim()||loading} fullWidth>
+        {loading?<><Spin/> analisando...</>:"Analisar thumbnail"}
+      </PrimaryBtn>
+      {analysis&&(
+        <div style={{marginTop:16,display:"flex",flexDirection:"column",gap:10}}>
+          <Card style={{display:"flex",alignItems:"center",gap:16}}>
+            <ScoreRing score={analysis.overallScore} size={90}/>
+            <div><Label>Resultado</Label><p style={{margin:"5px 0 0",fontSize:13,color:C.textMid,lineHeight:1.4}}>{analysis.verdict}</p></div>
+          </Card>
+          {analysis.scores&&(
+            <Card>
+              <Label>Breakdown</Label>
+              <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:9}}>
+                {Object.entries(analysis.scores).map(([k,v])=>(
+                  <div key={k}>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                      <span style={{fontSize:12,color:C.textMid}}>{sLabels[k]||k}</span>
+                      <span style={{fontSize:11,fontWeight:600,color:C.text,fontFamily:"'JetBrains Mono',monospace"}}>{v}/10</span>
+                    </div>
+                    <Bar value={v*10}/>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+            {analysis.strengths?.length>0&&<Card><Label>Pontos fortes</Label><div style={{marginTop:7}}>{analysis.strengths.map((s,i)=><p key={i} style={{margin:"0 0 4px",fontSize:11,color:C.textMid}}>· {s}</p>)}</div></Card>}
+            {analysis.improvements?.length>0&&<Card><Label>Melhorias</Label><div style={{marginTop:7}}>{analysis.improvements.map((s,i)=><p key={i} style={{margin:"0 0 4px",fontSize:11,color:C.textMid}}>· {s}</p>)}</div></Card>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════
+   MAIN APP
+════════════════════════════════════════════ */
+
+const SW = 216; // sidebar width
+
+export default function ViralToolkit(){
+  const[active,setActive]=useState("radar");
+  const[mobileOpen,setMobileOpen]=useState(false);
+  const tool=TOOLS.find(t=>t.id===active);
+
+  useEffect(()=>{
+    const link=document.createElement("link");
+    link.rel="stylesheet";link.href=FONTS_URL;
     document.head.appendChild(link);
-    return () => document.head.removeChild(link);
-  }, []);
+    return()=>document.head.removeChild(link);
+  },[]);
 
-  const tool = TOOLS.find((t) => t.id === activeTool);
+  const renderTool=()=>{
+    if(active==="radar")     return <TrendRadarSection/>;
+    if(active==="video")     return <VideoAnalyzer/>;
+    if(active==="viral")     return <ViralScoreChecker/>;
+    if(active==="ideas")     return <ContentIdeasGenerator/>;
+    if(active==="captions")  return <CaptionGenerator/>;
+    if(active==="thumbnail") return <ThumbnailAnalyzer/>;
+    return null;
+  };
 
-  return (
-    <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0a0a0f 0%, #0f0f1a 50%, #0a0a0f 100%)", fontFamily: "'Sora', sans-serif", color: "#fff" }}>
+  return(
+    <div style={{minHeight:"100vh",background:C.bg,fontFamily:"'Inter',sans-serif",color:C.text,display:"flex"}}>
       <style>{`
-        * { box-sizing: border-box; }
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
-        @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.85)} }
-        @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
-        input::placeholder { color: rgba(255,255,255,0.2); }
-        select option { background: #1a1a2e; }
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+        ::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:${C.border};border-radius:2px;}
+        @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+        @keyframes pulse_{0%,100%{opacity:.35}50%{opacity:.6}}
+        input::placeholder,textarea::placeholder{color:${C.textDim};}
+        select option{background:#0a0a0a;color:#fff;}
+        button:focus-visible{outline:2px solid ${C.blue};outline-offset:2px;}
+        @media(max-width:680px){
+          .vt-sidebar{transform:translateX(-100%);transition:transform .22s ease;position:fixed!important;z-index:100;}
+          .vt-sidebar.open{transform:translateX(0);}
+          .vt-overlay{display:block!important;}
+          .vt-main{margin-left:0!important;}
+          .vt-mobile-bar{display:flex!important;}
+        }
       `}</style>
 
-      {/* Header */}
-      <div style={{ padding: "24px 20px 0", maxWidth: 680, margin: "0 auto" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 12, background: "linear-gradient(135deg, #fe2c55, #ff7b00)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>⚡</div>
+      {/* ── SIDEBAR ── */}
+      <div className={`vt-sidebar${mobileOpen?" open":""}`}
+        style={{width:SW,background:C.surface,borderRight:`1px solid ${C.border}`,display:"flex",flexDirection:"column",position:"fixed",top:0,left:0,bottom:0,overflowY:"auto"}}>
+
+        {/* Logo */}
+        <div style={{padding:"18px 14px 14px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:9}}>
+          <div style={{width:26,height:26,borderRadius:5,border:`1px solid ${C.blueBorder}`,background:C.blueDim,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <circle cx="6" cy="6" r="4.5" stroke={C.blue} strokeWidth="1"/>
+              <circle cx="6" cy="6" r="2" fill={C.blue}/>
+              <line x1="6" y1="0.5" x2="6" y2="1.5" stroke={C.blue} strokeWidth="1" strokeLinecap="round"/>
+              <line x1="6" y1="10.5" x2="6" y2="11.5" stroke={C.blue} strokeWidth="1" strokeLinecap="round"/>
+              <line x1="0.5" y1="6" x2="1.5" y2="6" stroke={C.blue} strokeWidth="1" strokeLinecap="round"/>
+              <line x1="10.5" y1="6" x2="11.5" y2="6" stroke={C.blue} strokeWidth="1" strokeLinecap="round"/>
+            </svg>
+          </div>
           <div>
-            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, letterSpacing: "-0.02em", background: "linear-gradient(135deg, #fff, rgba(255,255,255,0.7))", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-              Viral Toolkit
-            </h1>
-            <p style={{ margin: 0, fontSize: 12, color: "rgba(255,255,255,0.35)", fontFamily: "'Space Mono', monospace" }}>
-              criador de conteúdo · powered by gemini
-            </p>
+            <div style={{fontSize:13,fontWeight:600,color:C.text,letterSpacing:"-0.01em"}}>Viral Toolkit</div>
+            <div style={{fontSize:9,color:C.textDim,fontFamily:"'JetBrains Mono',monospace",marginTop:1}}>gemini · v2</div>
           </div>
         </div>
 
-        {/* Nav */}
-        <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4, marginBottom: 24, scrollbarWidth: "none" }}>
-          {TOOLS.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setActiveTool(t.id)}
-              style={{
-                flexShrink: 0, padding: "8px 14px", borderRadius: 99,
-                border: activeTool === t.id ? "1.5px solid rgba(254,44,85,0.6)" : "1.5px solid rgba(255,255,255,0.08)",
-                background: activeTool === t.id ? "rgba(254,44,85,0.12)" : "rgba(255,255,255,0.03)",
-                color: activeTool === t.id ? "#fe2c55" : "rgba(255,255,255,0.45)",
-                fontWeight: activeTool === t.id ? 700 : 500,
-                fontSize: 13, cursor: "pointer", transition: "all 0.2s",
-                fontFamily: "'Sora', sans-serif",
-                display: "flex", alignItems: "center", gap: 5,
-              }}
-            >
-              {t.icon} {t.label}
-            </button>
-          ))}
+        {/* Nav items */}
+        <nav style={{flex:1,padding:"10px 8px"}}>
+          <div style={{padding:"4px 6px 8px"}}><Label>Ferramentas</Label></div>
+          {TOOLS.map(t=>{
+            const on=active===t.id;
+            return(
+              <button key={t.id} onClick={()=>{setActive(t.id);setMobileOpen(false);}}
+                style={{width:"100%",padding:"8px 10px",borderRadius:5,border:`1px solid ${on?C.blueBorder:"transparent"}`,background:on?C.blueDim:"transparent",color:on?C.blue:C.textMid,fontSize:12,fontWeight:on?500:400,cursor:"pointer",transition:"all 0.12s",textAlign:"left",display:"flex",alignItems:"center",gap:8,marginBottom:1}}
+                onMouseEnter={e=>{if(!on){e.currentTarget.style.background=C.surfaceHover;e.currentTarget.style.color=C.text;}}}
+                onMouseLeave={e=>{if(!on){e.currentTarget.style.background="transparent";e.currentTarget.style.color=C.textMid;}}}>
+                <span style={{width:5,height:5,borderRadius:"50%",background:on?C.blue:"transparent",border:`1px solid ${on?C.blue:C.border}`,flexShrink:0,transition:"all 0.12s"}}/>
+                {t.label}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Sidebar footer */}
+        <div style={{padding:"10px 14px",borderTop:`1px solid ${C.border}`}}>
+          <p style={{fontSize:9,color:C.textDim,fontFamily:"'JetBrains Mono',monospace",lineHeight:1.8}}>
+            gemini-2.0-flash<br/>google search grounding
+          </p>
         </div>
       </div>
 
-      {/* Content */}
-      <div style={{ maxWidth: 680, margin: "0 auto", padding: "0 20px 40px" }}>
-        {/* Tool header */}
-        <div style={{ marginBottom: 20 }}>
-          <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700 }}>
-            {tool?.icon} {tool?.label}
-          </h2>
-          <p style={{ margin: 0, fontSize: 13, color: "rgba(255,255,255,0.4)" }}>{tool?.description}</p>
+      {/* Mobile overlay */}
+      <div className="vt-overlay" onClick={()=>setMobileOpen(false)}
+        style={{display:"none",position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:50}}/>
+
+      {/* ── MAIN ── */}
+      <div className="vt-main" style={{marginLeft:SW,flex:1,minWidth:0,display:"flex",flexDirection:"column"}}>
+
+        {/* Mobile topbar */}
+        <div className="vt-mobile-bar"
+          style={{display:"none",alignItems:"center",gap:10,padding:"12px 16px",borderBottom:`1px solid ${C.border}`,position:"sticky",top:0,background:C.bg,zIndex:30}}>
+          <button onClick={()=>setMobileOpen(true)}
+            style={{width:30,height:30,borderRadius:5,border:`1px solid ${C.border}`,background:"transparent",color:C.text,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>
+            ☰
+          </button>
+          <span style={{fontSize:13,fontWeight:500}}>{tool?.label}</span>
         </div>
 
-        {/* Tool content */}
-        {activeTool === "radar" && <TrendRadarSection />}
-        {activeTool === "viral" && <ViralScoreChecker />}
-        {activeTool === "ideas" && <ContentIdeasGenerator />}
-        {activeTool === "captions" && <CaptionGenerator />}
-        {activeTool === "thumbnail" && <ThumbnailAnalyzer />}
-        {activeTool === "video" && <VideoAnalyzer />}
+        {/* Page header */}
+        <div style={{padding:"24px 24px 18px",borderBottom:`1px solid ${C.border}`}}>
+          <h1 style={{fontSize:15,fontWeight:600,color:C.text,marginBottom:3,letterSpacing:"-0.01em"}}>{tool?.label}</h1>
+          <p style={{fontSize:12,color:C.textDim}}>{tool?.description}</p>
+        </div>
+
+        {/* Content */}
+        <div style={{padding:"22px 24px 60px",maxWidth:660,width:"100%"}}>
+          {renderTool()}
+        </div>
       </div>
     </div>
   );
