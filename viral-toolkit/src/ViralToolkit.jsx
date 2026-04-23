@@ -357,8 +357,6 @@ function VideoAnalyzer(){
   const handleFile=f=>{if(!f||!f.type.startsWith("video/"))return;setFile(f);setAnalysis(null);setPreview(URL.createObjectURL(f));};
 
   const analyze=async()=>{
-    const apiKey=import.meta.env.VITE_GEMINI_API_KEY;
-    if(!apiKey){alert("VITE_GEMINI_API_KEY não configurada");return;}
     setLoading(true);setAnalysis(null);
     try{
       let base64=null,mimeType="video/mp4";
@@ -371,15 +369,18 @@ function VideoAnalyzer(){
       const prompt=`Analise este vídeo para redes sociais brasileiras. Avalie o potencial viral.
 Responda SOMENTE com JSON:
 {"viralScore":<0-100>,"verdict":"frase curta","scores":{"hook":<0-10>,"emotion":<0-10>,"retention":<0-10>,"shareable":<0-10>,"trend":<0-10>,"audio":<0-10>,"editing":<0-10>},"strengths":["p1","p2","p3"],"improvements":["m1","m2","m3"],"bestPlatform":"plataforma","estimatedReach":"ex: 10k–50k views","hookSuggestion":"gancho sugerido","bestPostTime":"horário ideal"}`;
-      const parts=base64?[{inlineData:{mimeType,data:base64}},{text:prompt}]:[{text:`URL: ${videoUrl}\n\n${prompt}`}];
-      const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,{
+      const body=base64
+        ?{prompt,mimeType,base64}
+        :{prompt:`URL: ${videoUrl}\n\n${prompt}`};
+      const r=await fetch("/api/analyze-media",{
         method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({contents:[{parts}],generationConfig:{temperature:0.3,maxOutputTokens:2048}}),
+        body:JSON.stringify(body),
       });
       const d=await r.json();
-      const raw=d?.candidates?.[0]?.content?.parts?.[0]?.text||"{}";
+      const raw=d?.text||"{}";
       const m=raw.match(/\{[\s\S]*\}/);
       if(m)setAnalysis(JSON.parse(m[0]));
+      else throw new Error(d.error||"Resposta inválida");
     }catch(e){alert("Erro: "+e.message);}
     finally{setLoading(false);setProgress("");}
   };
@@ -576,17 +577,17 @@ function ContentIdeasGenerator(){
     if(!niche.trim())return;
     setLoading(true);setIdeas([]);
     try{
-      const apiKey=import.meta.env.VITE_GEMINI_API_KEY;
       const prompt=`Gere 5 ideias virais. Nicho: ${niche}. Plataforma: ${PLATFORMS.find(p=>p.id===platform)?.label}. Formato: ${formats.find(f=>f.id===format)?.label}.
 JSON array: [{"title":"título","hook":"gancho 3s","structure":"intro→dev→CTA","viralFactor":"por que viraliza"}]`;
-      const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,{
+      const r=await fetch("/api/gemini",{
         method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.9,maxOutputTokens:2048}}),
+        body:JSON.stringify({prompt,temperature:0.9}),
       });
       const d=await r.json();
-      const raw=d?.candidates?.[0]?.content?.parts?.[0]?.text||"[]";
+      const raw=d?.text||"[]";
       const m=raw.match(/\[[\s\S]*\]/);
       if(m)setIdeas(JSON.parse(m[0]));
+      else throw new Error(d.error||"Resposta inválida");
     }catch(e){console.error(e);}finally{setLoading(false);}
   };
 
@@ -640,17 +641,17 @@ function CaptionGenerator(){
     if(!topic.trim())return;
     setLoading(true);setCaptions([]);
     try{
-      const apiKey=import.meta.env.VITE_GEMINI_API_KEY;
       const prompt=`Crie 3 legendas para Instagram/TikTok sobre "${topic}" no tom: ${tone}. Com gancho, desenvolvimento, CTA e hashtags.
 JSON: [{"caption":"texto","cta":"chamada","hooks":"primeira linha"}]`;
-      const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,{
+      const r=await fetch("/api/gemini",{
         method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.85,maxOutputTokens:2048}}),
+        body:JSON.stringify({prompt,temperature:0.85}),
       });
       const d=await r.json();
-      const raw=d?.candidates?.[0]?.content?.parts?.[0]?.text||"[]";
+      const raw=d?.text||"[]";
       const m=raw.match(/\[[\s\S]*\]/);
       if(m)setCaptions(JSON.parse(m[0]));
+      else throw new Error(d.error||"Resposta inválida");
     }catch(e){console.error(e);}finally{setLoading(false);}
   };
 
@@ -698,20 +699,20 @@ function ThumbnailAnalyzer(){
     if(!url.trim())return;
     setLoading(true);setAnalysis(null);
     try{
-      const apiKey=import.meta.env.VITE_GEMINI_API_KEY;
       const imgRes=await fetch(url);
       const blob=await imgRes.blob();
       const base64=await new Promise(res=>{const r=new FileReader();r.onloadend=()=>res(r.result.split(",")[1]);r.readAsDataURL(blob);});
       const prompt=`Analise esta thumbnail. Avalie 0-10: clareza, emoção, texto, cores, CTR.
 JSON: {"overallScore":<0-100>,"scores":{"clarity":<0-10>,"emotion":<0-10>,"text":<0-10>,"colors":<0-10>,"ctr":<0-10>},"strengths":["s1","s2"],"improvements":["m1","m2"],"verdict":"frase"}`;
-      const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,{
+      const r=await fetch("/api/analyze-media",{
         method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({contents:[{parts:[{inlineData:{mimeType:blob.type||"image/jpeg",data:base64}},{text:prompt}]}],generationConfig:{temperature:0.3,maxOutputTokens:1024}}),
+        body:JSON.stringify({prompt,mimeType:blob.type||"image/jpeg",base64}),
       });
       const d=await r.json();
-      const raw=d?.candidates?.[0]?.content?.parts?.[0]?.text||"{}";
+      const raw=d?.text||"{}";
       const m=raw.match(/\{[\s\S]*\}/);
       if(m)setAnalysis(JSON.parse(m[0]));
+      else throw new Error(d.error||"Resposta inválida");
     }catch(e){console.error(e);}finally{setLoading(false);}
   };
 
